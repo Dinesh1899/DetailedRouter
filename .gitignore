@@ -1,3 +1,4 @@
 ref/
 .vscode/
 *_out.def
+*.log
