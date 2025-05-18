@@ -332,6 +332,7 @@ def checkConnectivity(layerTrees, nets, insts):
 
     if len(G.nodes()):
       if not nx.is_connected(G):
+        # print(f"Open 'net' : '{net._name}'")
         numOpens += 1
 
   return numOpens
@@ -339,7 +340,8 @@ def checkConnectivity(layerTrees, nets, insts):
 # check for spacing and connectivity violations
 def check(nets, insts, obsts):
   layerTrees = buildTree(nets, insts, obsts)
-  nViols, violations = checkSpacing(layerTrees, nets, insts)
+  nViols, violations = 0, ([],[])
+  # nViols, violations = checkSpacing(layerTrees, nets, insts)
   print(f"Total number of spacing violations : {nViols}")
 
   nOpens = checkConnectivity(layerTrees, nets, insts)

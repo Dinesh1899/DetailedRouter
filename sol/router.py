@@ -75,7 +75,8 @@ class Vertex:
       return self.cost() < r.cost()
 
   def __eq__(self, other):
-    return self.x == other.x and self.y == other.y and self.layer == other.layer
+    return self._id == other._id
+    # return self.x == other.x and self.y == other.y and self.layer == other.layer
 
   def __hash__(self):
     return hash((self.x, self.y, self.layer))
@@ -119,7 +120,9 @@ def astar(V, s, t):
   
   while not Q.empty():
     u = Q.pop()
-    if u == t: break
+    if u == t:
+      # printlog(f"Extracted Target ID: {u._id} XY : {u.x}, {u.y} Layer: {u.layer}, Parent: {u._parent}", True) 
+      break
     for vid in u._nbrs:
       v = V[vid]
       newcost = u._g + dist(u, v)
@@ -128,8 +131,12 @@ def astar(V, s, t):
         if v in Q:
           Q.update(v, newcost)
         else:
+          # if v == t:
+          #   printlog(f"Inserted Target Parent ID: {u._id} XY : {u.x}, {u.y} Layer: {u.layer}, Parent: {u._parent}", True)
+          #   printlog(f"Inserted Target ID: {v._id} XY : {v.x}, {v.y} Layer: {v.layer}, Parent: {v._parent}", True)
           Q.push(v)
-  
+
+  # printlog(f" Actual Target ID: {t._id} XY : {t.x}, {t.y} Layer: {t.layer}, Parent: {t._parent}",True)
   path = [t]
   while path[-1]._parent is not None:
     path.append(path[-1]._parent)
@@ -265,14 +272,14 @@ class Net:
       for reg in regions:
         self.add_tracks(tr_dict[layer], tr_data, reg)
     
-    print_trdict(tr_dict)
+    # print_trdict(tr_dict)
     ## Add source and sink vertices at li1 and met1 layers
 
     self.add_vertices_to_tracks(tr_dict, vertices)
     self.connect_vertices_on_tracks(tr_dict, vertices)
           
     #plot_vertices(tr_dict, self._name)
-    print_vertices(vertices)
+    # print_vertices(vertices)
     return tr_dict, vertices
 
   def connect_vertices_on_tracks(self, tr_dict, vertices):
@@ -358,23 +365,60 @@ class Net:
     print_sources(srcs, vertices)
     ## Call astar for each source and target pair and get the path
     paths = self.getpath(srcs, vertices)
-    print_path(paths)
+    # print_path(paths)
     self.add_shapes(paths)
     ## Add the path to the net
 
   def add_shapes(self, paths):
     for path in paths:
-      for i in range(len(path)-1):
+      i = 0
+      while i < len(path) - 1:
         u = path[i]
-        v = path[i+1]
-        if u.layer == v.layer:
-          b = layerWidth[u.layer] // 2
-          xl = min(u.x, v.x) - b
-          yl = min(u.y, v.y) - b
-          xh = max(u.x, v.x) + b
-          yh = max(u.y, v.y) + b
-          r = Rect(xl, yl, xh, yh)
-          self._sol.append((u.layer, r))
+        x1, y1 = u.x, u.y
+        x2, y2 = u.x, u.y
+        i+=1
+        v = path[i]
+        if layerOrient[u.layer] == 'HORIZONTAL':
+          while u.layer == v.layer and u.y == v.y and i < len(path):
+            u = v
+            x2, y2 = u.x, u.y
+            if i == len(path) - 1: break
+            i+=1
+            v = path[i]
+        else:
+          while u.layer == v.layer and u.x == v.x and i < len(path):
+            u = v
+            x2, y2 = u.x, u.y
+            if i == len(path) - 1: break           
+            i+=1
+            v = path[i]
+
+        if x1 == x2 and y1 == y2: continue  
+        
+        b = layerWidth[u.layer] // 2
+        xl, yl = min(x1, x2) - b, min(y1, y2) - b
+        xh, yh = max(x1, x2) + b, max(y1, y2) + b
+        r = Rect(xl, yl, xh, yh)
+        self._sol.append((u.layer, r))
+        
+        
+      # for i in range(len(path)):
+      #   u = path[i]
+      #   v = path[i+1]
+      #   xl = xh = yh = yl = 0
+      #   if layerOrient[u.layer] == 'HORIZONTAL':
+      #     while u.layer == v.layer and u.y == v.y:
+      #       i+=1
+      #       v = path[i]
+
+      #   if u.layer == v.layer:
+      #     b = layerWidth[u.layer] // 2
+      #     xl = min(u.x, v.x) - b
+      #     yl = min(u.y, v.y) - b
+      #     xh = max(u.x, v.x) + b
+      #     yh = max(u.y, v.y) + b
+      #     r = Rect(xl, yl, xh, yh)
+      #     self._sol.append((u.layer, r))
 
   def getpath(self, srcs, vertices):
     ## Get the source and target vertices
@@ -393,8 +437,9 @@ class Net:
     srcs = list()
     for p, lr in self._pins.items():
       for layer, rects in lr.items():
-        ## if layer not in trdict: continue      
-        for r in rects:
+        ## if layer not in trdict: continue
+        rect = [get_bbox(rects)]
+        for r in rect:
           ## Get the source and target vertices
           if layerOrient[layer] == 'HORIZONTAL':
             tr_data = tracks[layer][0]
@@ -418,6 +463,9 @@ class Net:
             tr_data = tracks[layer][1]
             nx = (r.ur.x - tr_data.x) // tr_data.step
             xp  = tr_data.x + nx * tr_data.step
+            # printlog(f"XP: {xp} Rect: {r.ll.x}, {r.ll.y}, {r.ur.x}, {r.ur.y} Layer: {layer} Tracks: {trdict[layer].keys()}", True)
+            if xp not in trdict[layer]:
+              xp = min(trdict[layer].keys())
             tr_vertices = trdict[layer][xp]
             yc = r.ll.y + (r.ur.y - r.ll.y) // 2
             pinv = Vertex(xp, yc, layer, len(vertices))
@@ -433,6 +481,17 @@ class Net:
             vertices[vid]._nbrs.append(pinv._id)
             srcs.append(vertices[pinv._id])
     return srcs     
+
+def get_bbox(rects):
+  xl = yl = xh = yh = 0
+  for r in rects:
+    if xl == 0 and yl == 0 and xh == 0 and yh == 0:
+      xl, yl = r.ll.x, r.ll.y
+      xh, yh = r.ur.x, r.ur.y
+    else:
+      xl, yl = min(xl, r.ll.x), min(yl, r.ll.y)
+      xh, yh = max(xh, r.ur.x), max(yh, r.ur.y)
+  return Rect(xl, yl, xh, yh)
 
 
 def print_trdict(tr_dict):
@@ -615,16 +674,6 @@ def printguides(nets):
       for r in rects:
         printlog(f"    Rect: {r.ll.x}, {r.ll.y}, {r.ur.x}, {r.ur.y}", False)
 
-def writeDEF(netDict, ideff, odef):
-  names = ["N1_d"]
-  for inet in ideff.nets():
-    if inet.name() in names:
-      shapes = netDict[inet.name()]._sol
-      for r in shapes:
-        layer, rect = r
-        inet.addRect(layer, rect.ll.x, rect.ll.y, rect.ur.x, rect.ur.y)
-
-  ideff.writeDEF(odef)
 
 def add_net_shapes(net, netDEF):
   for r in net._sol:
@@ -632,11 +681,75 @@ def add_net_shapes(net, netDEF):
     netDEF.addRect(layer, rect.ll.x, rect.ll.y, rect.ur.x, rect.ur.y)  
 
 def route_nets(nets: list[Net], layerTrees, tracks):
-  ids = [1]
+  ids = [4] # 1: N1_d, 8:N3, 9:N3_d, 15: net1, 2: _02_
   for net in nets:
     if net._id in ids:
       printlog(f"Routing net: {net._name} ID: {net._id}", True)
       net.route(layerTrees, tracks)
+
+def writeDEF(netDict, ideff, odef):
+  names = ["_04_"]
+
+  # for name in netDict:
+  #   if len(netDict[name]._pins.keys()) > 2:
+  #     print(f"Net: {name}") 
+
+
+  for inet in ideff.nets():
+    if inet.name() in names:
+      if inet.name() not in skipNets:
+        shapes = netDict[inet.name()]._sol
+        for r in shapes:
+          layer, rect = r
+          inet.addRect(layer, rect.ll.x, rect.ll.y, rect.ur.x, rect.ur.y)
+
+  ideff.writeDEF(odef)
+
+
+
+def plot_rectangles(color='blue', alpha=0.5, title="Rectangles"):
+  import matplotlib.pyplot as plt
+  import matplotlib.patches as patches
+
+  rects = []
+  rects.append(Rect(7925, 28760, 8195, 29665))
+  rects.append(Rect(8025, 27960, 8195, 28760))
+  rects.append(Rect(7935, 27455, 8195, 27960))
+
+
+
+  """
+  Plot a list of rectangles
+  Args:
+    rects: List of Rect objects with ll (lower left) and ur (upper right) coordinates
+    color: Color for the rectangles
+    alpha: Transparency value (0-1)
+    title: Plot title
+  """
+  fig, ax = plt.subplots()
+  
+  # Plot each rectangle
+  for rect in rects:
+    width = rect.ur.x - rect.ll.x
+    height = rect.ur.y - rect.ll.y
+    
+    rect_patch = patches.Rectangle(
+      (rect.ll.x, rect.ll.y),
+      width, height,
+      facecolor=color,
+      alpha=alpha
+    )
+    ax.add_patch(rect_patch)
+  
+  # Update plot limits to show all rectangles
+  ax.autoscale()
+  
+  # Add grid and title
+  ax.grid(True)
+  ax.set_title(title)
+  
+  plt.show()
+
 
 ## Detail Router
 def detailed_route(idef, ilef, guide, odef):
@@ -663,13 +776,13 @@ def detailed_route(idef, ilef, guide, odef):
   layerTrees = buildTree(nets, insts, obsts)
   route_nets(nets, layerTrees, tracks)
   writeDEF(netDict, ideff, odef)
-
+  # plot_rectangles()
   return None
 
 
 if __name__ == "__main__":
   # Example usage
-  ckt = "c17"
+  ckt = "add5"
   idef = f"def/{ckt}.def"
   ilef = f"lef/sky130.lef"
   guide = f"gr/{ckt}.guide"
@@ -677,4 +790,10 @@ if __name__ == "__main__":
   VERBOSE = True
   LOG_FILE = f"router_{ckt}.log"
   printlog(f"Start routing {ckt}", True)
+  printlog(f"                     ", True)
+  printlog(f"                     ", True)
+  printlog(f"                     ", True)
   detailed_route(idef, ilef, guide, odef)
+  
+  from checker import loadAndCheck
+  loadAndCheck(odef, idef, ilef, False)
