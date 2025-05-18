@@ -55,17 +55,24 @@ class Vertex:
     self._costs = []
 
   def cost(self):
-    return sum(self._costs)
+    return self._g + self._h
+  def __lt__(self, r):
+    if self.cost() == r.cost():
+      return self._g > r._g
+    else:
+      return self.cost() < r.cost() 
+
+  def cost1(self):
+    return #sum(self._costs)
   
   def __repr__(self):
     return f"({self.x}, {self.y}, {self.layer})"
 
   def __lt__(self, r):
-    return self.cost() < r.cost()
-    # if self.cost() == r.cost():
-    #   return self._g > r._g
-    # else:
-    #   return self.cost() < r.cost()
+    if self.cost() == r.cost():
+      return self._g > r._g
+    else:
+      return self.cost() < r.cost()
 
   def __eq__(self, other):
     return self.x == other.x and self.y == other.y and self.layer == other.layer
@@ -113,7 +120,8 @@ def astar(V, s, t):
   while not Q.empty():
     u = Q.pop()
     if u == t: break
-    for v in u._nbrs:
+    for vid in u._nbrs:
+      v = V[vid]
       newcost = u._g + dist(u, v)
       if newcost < v._g:
         v._g, v._parent = newcost, u
@@ -217,6 +225,7 @@ class Net:
     self._id   = idx # unique ID used to identify nets from rtree
     self._bbox = Rect(0, 0, 0, 0) ## Largest Rectangle that contains all the pins
     self._guides = dict()
+    self._sol = []
     for p in net.pins():
       if p[0] in insts:
         self._pins[p] = insts[p[0]]._pins[p[1]] # copy shapes from the transformed instance pins
@@ -256,14 +265,32 @@ class Net:
       for reg in regions:
         self.add_tracks(tr_dict[layer], tr_data, reg)
     
+    print_trdict(tr_dict)
     ## Add source and sink vertices at li1 and met1 layers
-    for layer in tr_dict:
-      printlog(f"Layer: {layer}, DIR:{layerOrient[layer]}", True)
-      track_info = ""
-      for tr in tr_dict[layer]:
-        track_info += f" {tr}"
-      printlog(f"  Tracks: {track_info}", True)
 
+    self.add_vertices_to_tracks(tr_dict, vertices)
+    self.connect_vertices_on_tracks(tr_dict, vertices)
+          
+    #plot_vertices(tr_dict, self._name)
+    print_vertices(vertices)
+    return tr_dict, vertices
+
+  def connect_vertices_on_tracks(self, tr_dict, vertices):
+    for layer in layerColors:
+      ## Add via edges with the layer above
+      if layer not in tr_dict: break
+      for ct in tr_dict[layer]:
+        tr_vertices = [v for k,v in sorted(tr_dict[layer][ct].items())]
+        for i,v in enumerate(tr_vertices):
+          if i == 0:
+            vertices[v]._nbrs.append(tr_vertices[i+1])
+          elif i == len(tr_vertices) - 1:
+            vertices[v]._nbrs.append(tr_vertices[i-1])
+          else:
+            vertices[v]._nbrs.append(tr_vertices[i+1])
+            vertices[v]._nbrs.append(tr_vertices[i-1])
+
+  def add_vertices_to_tracks(self, tr_dict, vertices):
     for layer in layerColors:
       ## Add via edges with the layer above
       if layer not in tr_dict: break
@@ -304,31 +331,10 @@ class Net:
               cv._nbrs.append(av._id)
               av._nbrs.append(cv._id)
               tr_dict[layer][ct][atr] = cv._id
-              tr_dict[adj_lr][atr][ct] = av._id          
-
-    for layer in layerColors:
-      ## Add via edges with the layer above
-      if layer not in tr_dict: break
-      for ct in tr_dict[layer]:
-        tr_vertices = [v for k,v in sorted(tr_dict[layer][ct].items())]
-        for i,v in enumerate(tr_vertices):
-          if i == 0:
-            vertices[v]._nbrs.append(tr_vertices[i+1])
-          elif i == len(tr_vertices) - 1:
-            vertices[v]._nbrs.append(tr_vertices[i-1])
-          else:
-            vertices[v]._nbrs.append(tr_vertices[i+1])
-            vertices[v]._nbrs.append(tr_vertices[i-1])
-
-    #plot_vertices(tr_dict, self._name)
-    for v in vertices:
-      printlog(f"ID: {v._id} Vertex: {v.x}, {v.y} Layer: {v.layer}", True)
-      for nbr in v._nbrs:
-        printlog(f"  NBR ID: {nbr} Vertex: {vertices[nbr].x}, {vertices[nbr].y} Layer: {vertices[nbr].layer}", True)
-              
+              tr_dict[adj_lr][atr][ct] = av._id   
 
   def add_tracks(self, tr_dict, tr_data, reg):
-    num, step, start  = tr_data.num, tr_data.step*10, tr_data.x
+    num, step, start  = tr_data.num, tr_data.step, tr_data.x
     dir = tr_data.orient
     lo = hi = 0
     if dir == 'X':
@@ -344,13 +350,119 @@ class Net:
     for i in range(lo, hi+1):
       tr_dict[start + i*step] = dict()
 
-
-
-
   def route(self, layerTrees, tracks):
     # Construct graph based on the guides and tracks information
-    self.create_graph(layerTrees, tracks)
+    trdict, vertices = self.create_graph(layerTrees, tracks)
+    srcs = self.get_src_tgt_vertices(trdict, vertices, tracks)
+    printlog(f"Source vertices", True)
+    print_sources(srcs, vertices)
+    ## Call astar for each source and target pair and get the path
+    paths = self.getpath(srcs, vertices)
+    print_path(paths)
+    self.add_shapes(paths)
+    ## Add the path to the net
 
+  def add_shapes(self, paths):
+    for path in paths:
+      for i in range(len(path)-1):
+        u = path[i]
+        v = path[i+1]
+        if u.layer == v.layer:
+          b = layerWidth[u.layer] // 2
+          xl = min(u.x, v.x) - b
+          yl = min(u.y, v.y) - b
+          xh = max(u.x, v.x) + b
+          yh = max(u.y, v.y) + b
+          r = Rect(xl, yl, xh, yh)
+          self._sol.append((u.layer, r))
+
+  def getpath(self, srcs, vertices):
+    ## Get the source and target vertices
+    paths = list()
+    for i in range(len(srcs)):
+      for j in range(i+1, len(srcs)):
+        s = srcs[i]
+        t = srcs[j]
+        path = astar(vertices, s, t)
+        paths.append(path)
+        #print_sources(path, vertices)
+    return paths
+
+  def get_src_tgt_vertices(self, trdict, vertices, tracks):
+    ## Iterate through all pins of the net
+    srcs = list()
+    for p, lr in self._pins.items():
+      for layer, rects in lr.items():
+        ## if layer not in trdict: continue      
+        for r in rects:
+          ## Get the source and target vertices
+          if layerOrient[layer] == 'HORIZONTAL':
+            tr_data = tracks[layer][0]
+            ny = (r.ur.y - tr_data.x) // tr_data.step
+            yp  = tr_data.x + ny * tr_data.step
+            tr_vertices = trdict[layer][yp]
+            xc = r.ll.x + (r.ur.x - r.ll.x) // 2
+            pinv = Vertex(xc, yp, layer, len(vertices))
+            vertices.append(pinv)
+            min_dist = 10000000
+            vid = None
+            ## Assume all pins have some overlapping vertices
+            for k, v in tr_vertices.items():
+              if abs(k - xc) < min_dist:
+                min_dist = abs(k - xc)
+                vid = v
+            pinv._nbrs.append(vid)
+            vertices[vid]._nbrs.append(pinv._id)
+            srcs.append(vertices[pinv._id])
+          else:
+            tr_data = tracks[layer][1]
+            nx = (r.ur.x - tr_data.x) // tr_data.step
+            xp  = tr_data.x + nx * tr_data.step
+            tr_vertices = trdict[layer][xp]
+            yc = r.ll.y + (r.ur.y - r.ll.y) // 2
+            pinv = Vertex(xp, yc, layer, len(vertices))
+            vertices.append(pinv)
+            min_dist = 10000000
+            vid = None
+            ## Assume all pins have some overlapping vertices
+            for k, v in tr_vertices.items():
+              if abs(k - yc) < min_dist:
+                min_dist = abs(k - yc)
+                vid = v
+            pinv._nbrs.append(vid)
+            vertices[vid]._nbrs.append(pinv._id)
+            srcs.append(vertices[pinv._id])
+    return srcs     
+
+
+def print_trdict(tr_dict):
+  for layer in tr_dict:
+    printlog(f"Layer: {layer}, DIR:{layerOrient[layer]}", True)
+    track_info = ""
+    for tr in tr_dict[layer]:
+      track_info += f" {tr}"
+    printlog(f"  Tracks: {track_info}", True)  
+
+def print_path(paths):
+  printlog("Paths:", True)
+  for path in paths:
+    printlog("  Path:", True)
+    for v in path:
+      printlog(f"    Vertex: {v.x}, {v.y} Layer: {v.layer}", True)
+
+
+
+def print_sources(srcs, vertices):
+  for v in srcs:
+    printlog(f"ID: {v._id} Vertex: {v.x}, {v.y} Layer: {v.layer}", True)
+    for nbr in v._nbrs:
+      printlog(f"  NBR ID: {nbr} Vertex: {vertices[nbr].x}, {vertices[nbr].y} Layer: {vertices[nbr].layer}", True)
+
+def print_vertices(vertices):
+  for v in vertices:
+    printlog(f"ID: {v._id} Vertex: {v.x}, {v.y} Layer: {v.layer}", True)
+    for nbr in v._nbrs:
+      printlog(f"  NBR ID: {nbr} Vertex: {vertices[nbr].x}, {vertices[nbr].y} Layer: {vertices[nbr].layer}", True)
 
 def markUnusedPins(nets, insts, pins, obsts):
   markpins = {k:False for k in pins}
@@ -399,14 +511,15 @@ def buildTree(nets, insts, obsts):
   return lT
 
 
-def get_components(odef, idef, lef):
-  leff = LEFDEFParser.LEFReader()
-  ideff = LEFDEFParser.DEFReader()
-  odeff = LEFDEFParser.DEFReader()
-  leff.readLEF(lef)
+def get_components(ideff, leff):
+  # leff = LEFDEFParser.LEFReader()
+  # ideff = LEFDEFParser.DEFReader()
+  # odeff = LEFDEFParser.DEFReader()
+  # leff.readLEF(lef)
+  # ideff.readDEF(idef)
+  # odeff.readDEF(odef)
+
   lefDict = {m.name() : m for m in leff.macros()}
-  ideff.readDEF(idef)
-  odeff.readDEF(odef)
 
   for layer in leff.layers():
     layerWidth[layer.name()] = layer.width()
@@ -425,10 +538,12 @@ def get_components(odef, idef, lef):
           pins[pn][layer].append(Rect(r.ll.x, r.ll.y, r.ur.x, r.ur.y))
 
   nets = list()
+  netDict = dict()
   idx = 0
   for net in ideff.nets():
     if net.name() not in skipNets:
       nets.append(Net(net, insts, pins, idx))
+      netDict[net.name()] = net
       idx += 1
 
   # for net in odeff.nets():
@@ -440,11 +555,6 @@ def get_components(odef, idef, lef):
   return [nets, insts, pins, obsts]
   # bbox = ideff.bbox()
 
-def get_tracks(idef):
-  ideff = LEFDEFParser.DEFReader()
-  ideff.readDEF(idef)
-  return ideff.tracks()
-
 def sort_nets(nets):
   for net in nets:
     net.calculate_bbox()
@@ -454,11 +564,11 @@ def sort_nets(nets):
 def printnets(nets):
   for net in nets:
     printlog(f"Net: {net._name} ID: {net._id} HPWL: {net.hpwl()} BBox: {net._bbox.ll.x}, {net._bbox.ll.y}, {net._bbox.ur.x}, {net._bbox.ur.y}", True)
-    # for p, lr in net._pins.items():
-    #   print(f"  Pin: {p[1]} Layer: {p[0]}")
-    #   for layer, rects in lr.items():
-    #     for r in rects:
-    #       print(f"    Rect: {r.ll.x}, {r.ll.y}, {r.ur.x}, {r.ur.y}")
+    for p, lr in net._pins.items():
+      printlog(f"  Pin: {p[1]} Type: {p[0]}", True)
+      for layer, rects in lr.items():
+        for r in rects:
+          printlog(f"    Layer:{layer} Rect: {r.ll.x}, {r.ll.y}, {r.ur.x}, {r.ur.y}", True)
 
 
 
@@ -505,6 +615,22 @@ def printguides(nets):
       for r in rects:
         printlog(f"    Rect: {r.ll.x}, {r.ll.y}, {r.ur.x}, {r.ur.y}", False)
 
+def writeDEF(netDict, ideff, odef):
+  names = ["N1_d"]
+  for inet in ideff.nets():
+    if inet.name() in names:
+      shapes = netDict[inet.name()]._sol
+      for r in shapes:
+        layer, rect = r
+        inet.addRect(layer, rect.ll.x, rect.ll.y, rect.ur.x, rect.ur.y)
+
+  ideff.writeDEF(odef)
+
+def add_net_shapes(net, netDEF):
+  for r in net._sol:
+    layer, rect = r
+    netDEF.addRect(layer, rect.ll.x, rect.ll.y, rect.ur.x, rect.ur.y)  
+
 def route_nets(nets: list[Net], layerTrees, tracks):
   ids = [1]
   for net in nets:
@@ -514,20 +640,29 @@ def route_nets(nets: list[Net], layerTrees, tracks):
 
 ## Detail Router
 def detailed_route(idef, ilef, guide, odef):
-  # Init Insts, Nets and Pins from LEF/DEF Files
-  nets, insts, pins, obsts = get_components(idef, idef, ilef)
-  tracks = get_tracks(idef)
+  # Init Insts, Nets and Pins from LEF/DEF Files  
+  leff = LEFDEFParser.LEFReader()
+  ideff = LEFDEFParser.DEFReader()
+  odeff = LEFDEFParser.DEFReader()
+  leff.readLEF(ilef)
+  ideff.readDEF(idef)
+  # odeff.readDEF(odef)  
+
+  nets, insts, pins, obsts = get_components(ideff, leff)
+  tracks = ideff.tracks()# get_tracks(idef)
+
   netDict = dict()
   for net in nets:
     netDict[net._name] = net
   
   sort_nets(nets)
-  # printnets(nets)
+  printnets(nets)
   parse_guides(netDict, guide)
   # printguides(nets)
   
   layerTrees = buildTree(nets, insts, obsts)
   route_nets(nets, layerTrees, tracks)
+  writeDEF(netDict, ideff, odef)
 
   return None
 
@@ -538,7 +673,7 @@ if __name__ == "__main__":
   idef = f"def/{ckt}.def"
   ilef = f"lef/sky130.lef"
   guide = f"gr/{ckt}.guide"
-  odef = f"def/{ckt}_out.def"    
+  odef = f"sol/{ckt}_out.def"    
   VERBOSE = True
   LOG_FILE = f"router_{ckt}.log"
   printlog(f"Start routing {ckt}", True)
