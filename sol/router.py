@@ -1,6 +1,8 @@
+from typing import OrderedDict
 import LEFDEFParser
 from LEFDEFParser import Rect
 import rtree
+import heapq as hq
 
 import datetime
 
@@ -17,6 +19,8 @@ skipCells = {"sky130_fd_sc_hd__decap_3", "sky130_fd_sc_hd__decap_4", "sky130_fd_
 
 layerColors = { 'li1': 'red', 'met1': 'blue', 'met2': 'green', 'met3': 'orange', 'met4': 'magenta', 'met5': 'cyan' }
 layerOrient = { 'li1': 'VERTICAL', 'met1': 'HORIZONTAL', 'met2': 'VERTICAL', 'met3': 'HORIZONTAL', 'met4': 'VERTICAL', 'met5': 'HORIZONTAL' }
+
+layerNum = {'li1': 1,'met1': 2,'met2': 3,'met3': 4,'met4': 5,'met5': 6}
 
 # skip power/ground/clock nets
 skipNets = {'clk', 'VPWR', 'VGND'}
@@ -36,7 +40,92 @@ layerSpacing = {'li1': 170, 'met1': 140, 'met2': 140, 'met3': 300, 'met4': 300, 
 VERBOSE = False
 LOG_FILE = "router_debug.log"
 import datetime
-# ...existing code...
+
+
+class Vertex:
+  def __init__(self, x, y, layer, id, parent=None, nbrs=None):
+    self._id = id
+    self.x = x
+    self.y = y
+    self.layer = layer
+    self._parent = parent
+    self._nbrs = []
+    self._g = None
+    self._h = None
+    self._costs = []
+
+  def cost(self):
+    return sum(self._costs)
+  
+  def __repr__(self):
+    return f"({self.x}, {self.y}, {self.layer})"
+
+  def __lt__(self, r):
+    return self.cost() < r.cost()
+    # if self.cost() == r.cost():
+    #   return self._g > r._g
+    # else:
+    #   return self.cost() < r.cost()
+
+  def __eq__(self, other):
+    return self.x == other.x and self.y == other.y and self.layer == other.layer
+
+  def __hash__(self):
+    return hash((self.x, self.y, self.layer))
+
+def dist(u, v):
+  return abs(u.x - v.x) + abs(u.y - v.y) + abs(layerNum[u.layer] - layerNum[v.layer])
+
+class priority_queue:
+  def __init__(self, vertices = []):
+    self._vertices = vertices[:]
+    self._q = vertices[:]
+    hq.heapify(self._q)
+  def push(self, v):
+    hq.heappush(self._q, v)
+  def pop(self):
+    return(hq.heappop(self._q))
+  def update(self, v, g):
+    try: i = self._q.index(v)
+    except ValueError: i = None
+    if i is not None:
+      self._q[i]._g = g
+      hq.heapify(self._q)
+  def updateIndex(self, i, g):
+    assert i < len(self._q)
+    self._vertices[i]._g = g
+    hq.heapify(self._q)
+  def empty(self):
+    return len(self._q) == 0
+  def __contains__(self, v):
+    return v in self._q
+  def __repr__(self):
+    return str(self._q)
+
+def astar(V, s, t):
+  for v in V:
+    v._g, v._h, v._parent = 10000000, dist(v,t), None
+  s._g = 0
+  s._h = dist(s,t)
+  Q = priority_queue()
+  Q.push(s)
+  
+  while not Q.empty():
+    u = Q.pop()
+    if u == t: break
+    for v in u._nbrs:
+      newcost = u._g + dist(u, v)
+      if newcost < v._g:
+        v._g, v._parent = newcost, u
+        if v in Q:
+          Q.update(v, newcost)
+        else:
+          Q.push(v)
+  
+  path = [t]
+  while path[-1]._parent is not None:
+    path.append(path[-1]._parent)
+  return path
 
 def printlog(str, print=False):
   timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -78,6 +167,48 @@ class Inst:
         r.transform(comp.orient(), origin, macro.xdim(), macro.ydim())
         self._obsts[layer].append(r)
 
+def plot_vertices(tr_dict, net_name):
+  """Plot vertices for each layer in tr_dict"""
+  import matplotlib.pyplot as plt
+  fig, axs = plt.subplots(2, 3, figsize=(15, 10))
+  fig.suptitle(f'Vertices for net {net_name}')
+  
+  # Map layers to subplot positions
+  layer_to_pos = {
+    'li1': (0, 0),
+    'met1': (0, 1),
+    'met2': (0, 2),
+    'met3': (1, 0),
+    'met4': (1, 1),
+    'met5': (1, 2)
+  }
+  
+  # Plot vertices for each layer
+  for layer in layerColors:
+    if layer not in tr_dict:
+      continue
+        
+    row, col = layer_to_pos[layer]
+    ax = axs[row, col]
+    
+    # Plot vertices
+    x_coords = []
+    y_coords = []
+    for track_pos, vertices in tr_dict[layer].items():
+      for vertex in vertices:
+        x_coords.append(vertex.x)
+        y_coords.append(vertex.y)
+    
+    ax.scatter(x_coords, y_coords, c=layerColors[layer], label=f'{layer} vertices')
+    ax.set_title(f'Layer {layer}')
+    ax.grid(True)
+    ax.legend()
+  
+  plt.tight_layout()
+  plt.savefig(f'ref/vertices_{net_name}.png')
+  plt.close()
+
+
 # wrapper Net class that has the actual pins at the transformed coordinates
 class Net:
   def __init__(self, net, insts, pins, idx):
@@ -113,6 +244,112 @@ class Net:
   def hpwl(self):
     return self._bbox.ur.x - self._bbox.ll.x + self._bbox.ur.y - self._bbox.ll.y
 
+  def create_graph(self, layerTrees, tracks):
+    # Create a graph representation of the net
+    tr_dict = dict()
+    vertices = list()
+    for layer, regions in self._guides.items():
+      t = 0 if layerOrient[layer] == 'HORIZONTAL' else 1
+      tr_data = tracks[layer][t]
+      if layer not in tr_dict:
+        tr_dict[layer] = dict()
+      for reg in regions:
+        self.add_tracks(tr_dict[layer], tr_data, reg)
+    
+    ## Add source and sink vertices at li1 and met1 layers
+    for layer in tr_dict:
+      printlog(f"Layer: {layer}, DIR:{layerOrient[layer]}", True)
+      track_info = ""
+      for tr in tr_dict[layer]:
+        track_info += f" {tr}"
+      printlog(f"  Tracks: {track_info}", True)
+
+    for layer in layerColors:
+      ## Add via edges with the layer above
+      if layer not in tr_dict: break
+      adj_lr = adjLayer[layer][1] if len(adjLayer[layer]) > 1 else adjLayer[layer][0]
+      if adj_lr not in tr_dict: break
+      for ct in tr_dict[layer]:
+        for atr in tr_dict[adj_lr]:
+          if layerOrient[layer] == 'HORIZONTAL':
+            if atr in tr_dict[layer][ct]:
+              cv = vertices[tr_dict[layer][ct][atr]]
+              av = Vertex(atr, ct, adj_lr, len(vertices))
+              vertices.append(av)
+              cv._nbrs.append(av._id)
+              av._nbrs.append(cv._id)
+              tr_dict[adj_lr][atr][ct] = av._id
+            else:
+              cv = Vertex(atr, ct, layer, len(vertices))
+              vertices.append(cv)
+              av = Vertex(atr, ct, adj_lr, len(vertices))
+              vertices.append(av)
+              cv._nbrs.append(av._id)
+              av._nbrs.append(cv._id)
+              tr_dict[layer][ct][atr] = cv._id
+              tr_dict[adj_lr][atr][ct] = av._id
+          else:
+            if atr in tr_dict[layer][ct]:
+              cv = vertices[tr_dict[layer][ct][atr]]
+              av = Vertex(ct, atr, adj_lr, len(vertices))
+              vertices.append(av)
+              cv._nbrs.append(av._id)
+              av._nbrs.append(cv._id)
+              tr_dict[adj_lr][atr][ct] = av._id
+            else:
+              cv = Vertex(ct, atr, layer, len(vertices))
+              vertices.append(cv)
+              av = Vertex(ct, atr, adj_lr, len(vertices))
+              vertices.append(av)
+              cv._nbrs.append(av._id)
+              av._nbrs.append(cv._id)
+              tr_dict[layer][ct][atr] = cv._id
+              tr_dict[adj_lr][atr][ct] = av._id          
+
+    for layer in layerColors:
+      ## Add via edges with the layer above
+      if layer not in tr_dict: break
+      for ct in tr_dict[layer]:
+        tr_vertices = [v for k,v in sorted(tr_dict[layer][ct].items())]
+        for i,v in enumerate(tr_vertices):
+          if i == 0:
+            vertices[v]._nbrs.append(tr_vertices[i+1])
+          elif i == len(tr_vertices) - 1:
+            vertices[v]._nbrs.append(tr_vertices[i-1])
+          else:
+            vertices[v]._nbrs.append(tr_vertices[i+1])
+            vertices[v]._nbrs.append(tr_vertices[i-1])
+
+    #plot_vertices(tr_dict, self._name)
+    for v in vertices:
+      printlog(f"ID: {v._id} Vertex: {v.x}, {v.y} Layer: {v.layer}", True)
+      for nbr in v._nbrs:
+        printlog(f"  NBR ID: {nbr} Vertex: {vertices[nbr].x}, {vertices[nbr].y} Layer: {vertices[nbr].layer}", True)
+              
+
+  def add_tracks(self, tr_dict, tr_data, reg):
+    num, step, start  = tr_data.num, tr_data.step*10, tr_data.x
+    dir = tr_data.orient
+    lo = hi = 0
+    if dir == 'X':
+      lo, hi = reg.ll.y, reg.ur.y
+    else:
+      lo, hi = reg.ll.x, reg.ur.x
+    
+    pl = int((lo - start) / step)
+    lo = pl + 1  if lo > start else 0
+    ph = int((hi - start) / step)
+    hi = ph if hi > start else 0
+
+    for i in range(lo, hi+1):
+      tr_dict[start + i*step] = dict()
+
+
+
+
+  def route(self, layerTrees, tracks):
+    # Construct graph based on the guides and tracks information
+    self.create_graph(layerTrees, tracks)
 
 
 def markUnusedPins(nets, insts, pins, obsts):
@@ -153,11 +390,6 @@ def buildTree(nets, insts, obsts):
       count += 1
 
   for net in nets:
-    for layer, rects in net._sol.items():
-      for r in rects:
-        lT[layer].insert(count, (r.ll.x, r.ll.y, r.ur.x, r.ur.y), obj=net._id)
-        count += 1
-
     for p, lr in net._pins.items():
       for layer, rects in lr.items():
         for r in rects:
@@ -207,6 +439,11 @@ def get_components(odef, idef, lef):
   markUnusedPins(nets, insts, pins, obsts)
   return [nets, insts, pins, obsts]
   # bbox = ideff.bbox()
+
+def get_tracks(idef):
+  ideff = LEFDEFParser.DEFReader()
+  ideff.readDEF(idef)
+  return ideff.tracks()
 
 def sort_nets(nets):
   for net in nets:
@@ -268,11 +505,18 @@ def printguides(nets):
       for r in rects:
         printlog(f"    Rect: {r.ll.x}, {r.ll.y}, {r.ur.x}, {r.ur.y}", False)
 
+def route_nets(nets: list[Net], layerTrees, tracks):
+  ids = [1]
+  for net in nets:
+    if net._id in ids:
+      printlog(f"Routing net: {net._name} ID: {net._id}", True)
+      net.route(layerTrees, tracks)
+
 ## Detail Router
 def detailed_route(idef, ilef, guide, odef):
   # Init Insts, Nets and Pins from LEF/DEF Files
   nets, insts, pins, obsts = get_components(idef, idef, ilef)
-  
+  tracks = get_tracks(idef)
   netDict = dict()
   for net in nets:
     netDict[net._name] = net
@@ -281,6 +525,10 @@ def detailed_route(idef, ilef, guide, odef):
   # printnets(nets)
   parse_guides(netDict, guide)
   # printguides(nets)
+  
+  layerTrees = buildTree(nets, insts, obsts)
+  route_nets(nets, layerTrees, tracks)
+
   return None
 
 
