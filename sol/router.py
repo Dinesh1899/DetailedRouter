@@ -365,7 +365,7 @@ class Net:
     print_sources(srcs, vertices)
     ## Call astar for each source and target pair and get the path
     paths = self.getpath(srcs, vertices)
-    # print_path(paths)
+    print_path(paths)
     self.add_shapes(paths)
     ## Add the path to the net
 
@@ -438,7 +438,7 @@ class Net:
     for p, lr in self._pins.items():
       for layer, rects in lr.items():
         ## if layer not in trdict: continue
-        rect = [get_bbox(rects)]
+        rect = [rects[0]]# [get_bbox(rects)]
         for r in rect:
           ## Get the source and target vertices
           if layerOrient[layer] == 'HORIZONTAL':
@@ -463,7 +463,7 @@ class Net:
             tr_data = tracks[layer][1]
             nx = (r.ur.x - tr_data.x) // tr_data.step
             xp  = tr_data.x + nx * tr_data.step
-            # printlog(f"XP: {xp} Rect: {r.ll.x}, {r.ll.y}, {r.ur.x}, {r.ur.y} Layer: {layer} Tracks: {trdict[layer].keys()}", True)
+            printlog(f"XP: {xp} Rect: {r.ll.x}, {r.ll.y}, {r.ur.x}, {r.ur.y} Layer: {layer} Tracks: {trdict[layer].keys()}", True)
             if xp not in trdict[layer]:
               xp = min(trdict[layer].keys())
             tr_vertices = trdict[layer][xp]
@@ -681,14 +681,14 @@ def add_net_shapes(net, netDEF):
     netDEF.addRect(layer, rect.ll.x, rect.ll.y, rect.ur.x, rect.ur.y)  
 
 def route_nets(nets: list[Net], layerTrees, tracks):
-  ids = [4] # 1: N1_d, 8:N3, 9:N3_d, 15: net1, 2: _02_
+  ids = [6] # 1: N1_d, 8:N3, 9:N3_d, 15: net1, 6: _06_
   for net in nets:
     if net._id in ids:
       printlog(f"Routing net: {net._name} ID: {net._id}", True)
       net.route(layerTrees, tracks)
 
 def writeDEF(netDict, ideff, odef):
-  names = ["_04_"]
+  names = ["_06_"]
 
   # for name in netDict:
   #   if len(netDict[name]._pins.keys()) > 2:
@@ -712,10 +712,24 @@ def plot_rectangles(color='blue', alpha=0.5, title="Rectangles"):
   import matplotlib.patches as patches
 
   rects = []
-  rects.append(Rect(7925, 28760, 8195, 29665))
-  rects.append(Rect(8025, 27960, 8195, 28760))
-  rects.append(Rect(7935, 27455, 8195, 27960))
 
+  
+  rects.append(Rect(19415, 31315, 19750, 31585))
+  rects.append(Rect(24505, 36465, 24930, 37085))
+  rects.append(Rect(27260, 24735, 27795, 25355))
+  rects.append(Rect(27260, 25355, 27575, 26375))
+  rects.append(Rect(27260, 26375, 27875, 26945))
+
+  rects.append(Rect( 24565, 36465, 24735, 36860 ))
+  rects.append(Rect( 19465, 31365, 19635, 36635 ))
+  rects.append(Rect( 14025, 24960, 14195, 25415 ))
+  rects.append(Rect( 19465, 25245, 19635, 31535 ))
+  rects.append(Rect( 14025, 24960, 14195, 25415 ))
+  rects.append(Rect( 24565, 25245, 24735, 36860 ))
+
+  rects.append(Rect( 19480, 36480, 24720, 36620 ))
+  rects.append(Rect( 14040, 25260, 19620, 25400 ))
+  rects.append(Rect( 14040, 25260, 24720, 25400 ))
 
 
   """
@@ -769,7 +783,7 @@ def detailed_route(idef, ilef, guide, odef):
     netDict[net._name] = net
   
   sort_nets(nets)
-  printnets(nets)
+  # printnets(nets)
   parse_guides(netDict, guide)
   # printguides(nets)
   
