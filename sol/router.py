@@ -365,7 +365,7 @@ class Net:
     print_sources(srcs, vertices)
     ## Call astar for each source and target pair and get the path
     paths = self.getpath(srcs, vertices)
-    print_path(paths)
+    # print_path(paths)
     self.add_shapes(paths)
     ## Add the path to the net
 
@@ -438,49 +438,108 @@ class Net:
     for p, lr in self._pins.items():
       for layer, rects in lr.items():
         ## if layer not in trdict: continue
-        rect = [rects[0]]# [get_bbox(rects)]
-        for r in rect:
-          ## Get the source and target vertices
-          if layerOrient[layer] == 'HORIZONTAL':
-            tr_data = tracks[layer][0]
-            ny = (r.ur.y - tr_data.x) // tr_data.step
-            yp  = tr_data.x + ny * tr_data.step
-            tr_vertices = trdict[layer][yp]
-            xc = r.ll.x + (r.ur.x - r.ll.x) // 2
-            pinv = Vertex(xc, yp, layer, len(vertices))
-            vertices.append(pinv)
-            min_dist = 10000000
-            vid = None
-            ## Assume all pins have some overlapping vertices
-            for k, v in tr_vertices.items():
-              if abs(k - xc) < min_dist:
-                min_dist = abs(k - xc)
-                vid = v
-            pinv._nbrs.append(vid)
-            vertices[vid]._nbrs.append(pinv._id)
-            srcs.append(vertices[pinv._id])
-          else:
-            tr_data = tracks[layer][1]
-            nx = (r.ur.x - tr_data.x) // tr_data.step
-            xp  = tr_data.x + nx * tr_data.step
-            printlog(f"XP: {xp} Rect: {r.ll.x}, {r.ll.y}, {r.ur.x}, {r.ur.y} Layer: {layer} Tracks: {trdict[layer].keys()}", True)
-            if xp not in trdict[layer]:
-              xp = min(trdict[layer].keys())
-            tr_vertices = trdict[layer][xp]
-            yc = r.ll.y + (r.ur.y - r.ll.y) // 2
-            pinv = Vertex(xp, yc, layer, len(vertices))
-            vertices.append(pinv)
-            min_dist = 10000000
-            vid = None
-            ## Assume all pins have some overlapping vertices
-            for k, v in tr_vertices.items():
-              if abs(k - yc) < min_dist:
-                min_dist = abs(k - yc)
-                vid = v
-            pinv._nbrs.append(vid)
-            vertices[vid]._nbrs.append(pinv._id)
-            srcs.append(vertices[pinv._id])
+        if layerOrient[layer] == 'VERTICAL':
+          r, xp = find_tracks_y(layer, rects, trdict)
+          if xp is None: 
+            printlog(f"No tracks found for pin {p} on layer {layer}", True)
+            continue
+          tr_vertices = trdict[layer][xp]
+          yc = r.ll.y + (r.ur.y - r.ll.y) // 2
+          pinv = Vertex(xp, yc, layer, len(vertices))
+          vertices.append(pinv)
+          min_dist = 10000000
+          vid = None
+          ## Assume all pins have some overlapping vertices
+          for k, v in tr_vertices.items():
+            if abs(k - yc) < min_dist:
+              min_dist = abs(k - yc)
+              vid = v
+          pinv._nbrs.append(vid)
+          vertices[vid]._nbrs.append(pinv._id)
+          srcs.append(vertices[pinv._id])            
+        else:
+          r, yp = find_tracks_x(layer, rects, trdict)
+          if yp is None: 
+            printlog(f"No tracks found for pin {p} on layer {layer}", True)
+            continue
+          tr_vertices = trdict[layer][yp]
+          xc = r.ll.x + (r.ur.x - r.ll.x) // 2
+          pinv = Vertex(xc, yp, layer, len(vertices))
+          vertices.append(pinv)
+          min_dist = 10000000
+          vid = None
+          ## Assume all pins have some overlapping vertices
+          for k, v in tr_vertices.items():
+            if abs(k - xc) < min_dist:
+              min_dist = abs(k - xc)
+              vid = v
+          pinv._nbrs.append(vid)
+          vertices[vid]._nbrs.append(pinv._id)
+          srcs.append(vertices[pinv._id])           
+
+
+
+        # rect = [rects[0]]# [get_bbox(rects)]
+        # for r in rect:
+        #   ## Get the source and target vertices
+        #   if layerOrient[layer] == 'HORIZONTAL':
+        #     tr_data = tracks[layer][0]
+        #     ny = (r.ur.y - tr_data.x) // tr_data.step
+        #     yp  = tr_data.x + ny * tr_data.step
+        #     tr_vertices = trdict[layer][yp]
+        #     xc = r.ll.x + (r.ur.x - r.ll.x) // 2
+        #     pinv = Vertex(xc, yp, layer, len(vertices))
+        #     vertices.append(pinv)
+        #     min_dist = 10000000
+        #     vid = None
+        #     ## Assume all pins have some overlapping vertices
+        #     for k, v in tr_vertices.items():
+        #       if abs(k - xc) < min_dist:
+        #         min_dist = abs(k - xc)
+        #         vid = v
+        #     pinv._nbrs.append(vid)
+        #     vertices[vid]._nbrs.append(pinv._id)
+        #     srcs.append(vertices[pinv._id])
+        #   else:
+        #     tr_data = tracks[layer][1]
+        #     nx = (r.ur.x - tr_data.x) // tr_data.step
+        #     xp  = tr_data.x + nx * tr_data.step
+        #     printlog(f"XP: {xp} Rect: {r.ll.x}, {r.ll.y}, {r.ur.x}, {r.ur.y} Layer: {layer} Tracks: {trdict[layer].keys()}", True)
+        #     if xp not in trdict[layer]:
+        #       xp = min(trdict[layer].keys())
+        #     tr_vertices = trdict[layer][xp]
+        #     yc = r.ll.y + (r.ur.y - r.ll.y) // 2
+        #     pinv = Vertex(xp, yc, layer, len(vertices))
+        #     vertices.append(pinv)
+        #     min_dist = 10000000
+        #     vid = None
+        #     ## Assume all pins have some overlapping vertices
+        #     for k, v in tr_vertices.items():
+        #       if abs(k - yc) < min_dist:
+        #         min_dist = abs(k - yc)
+        #         vid = v
+        #     pinv._nbrs.append(vid)
+        #     vertices[vid]._nbrs.append(pinv._id)
+        #     srcs.append(vertices[pinv._id])
     return srcs     
+
+def find_tracks_y(layer, rects, trdict):
+  b = layerWidth[layer] // 2
+  for r in rects:
+    for pos in trdict[layer]:
+      if r.ll.x <= pos - b <= r.ur.x or r.ll.x <= pos + b <= r.ur.x:
+        printlog(f"XP: {pos} Rect: {r.ll.x}, {r.ll.y}, {r.ur.x}, {r.ur.y} Layer: {layer} Tracks: {trdict[layer].keys()}", True)        
+        return r, pos
+  return None, None
+
+def find_tracks_x(layer, rects, trdict):
+  b = layerWidth[layer] // 2
+  for r in rects:
+    for pos in trdict[layer]:
+      if r.ll.y <= pos - b <= r.ur.y or r.ll.y <= pos + b <= r.ur.y:
+        printlog(f"YP: {pos} Rect: {r.ll.x}, {r.ll.y}, {r.ur.x}, {r.ur.y} Layer: {layer} Tracks: {trdict[layer].keys()}", True)        
+        return r, pos
+  return None, None
 
 def get_bbox(rects):
   xl = yl = xh = yh = 0
@@ -681,14 +740,14 @@ def add_net_shapes(net, netDEF):
     netDEF.addRect(layer, rect.ll.x, rect.ll.y, rect.ur.x, rect.ur.y)  
 
 def route_nets(nets: list[Net], layerTrees, tracks):
-  ids = [6] # 1: N1_d, 8:N3, 9:N3_d, 15: net1, 6: _06_
+  ids = [4] # 1: N1_d, 8:N3, 9:N3_d, 15: net1, 6: _06_, 4: N22_d
   for net in nets:
-    if net._id in ids:
+    # if net._id in ids:
       printlog(f"Routing net: {net._name} ID: {net._id}", True)
       net.route(layerTrees, tracks)
 
 def writeDEF(netDict, ideff, odef):
-  names = ["_06_"]
+  names = ["N22_d"]
 
   # for name in netDict:
   #   if len(netDict[name]._pins.keys()) > 2:
@@ -696,7 +755,7 @@ def writeDEF(netDict, ideff, odef):
 
 
   for inet in ideff.nets():
-    if inet.name() in names:
+    # if inet.name() in names:
       if inet.name() not in skipNets:
         shapes = netDict[inet.name()]._sol
         for r in shapes:
@@ -713,23 +772,11 @@ def plot_rectangles(color='blue', alpha=0.5, title="Rectangles"):
 
   rects = []
 
-  
-  rects.append(Rect(19415, 31315, 19750, 31585))
-  rects.append(Rect(24505, 36465, 24930, 37085))
-  rects.append(Rect(27260, 24735, 27795, 25355))
-  rects.append(Rect(27260, 25355, 27575, 26375))
-  rects.append(Rect(27260, 26375, 27875, 26945))
+  rects.append(Rect(15725, 24735, 15985, 25415))
+  rects.append(Rect(15725, 25415, 15895, 26615))
+  rects.append(Rect(15725, 26615, 15985, 26945))
 
-  rects.append(Rect( 24565, 36465, 24735, 36860 ))
-  rects.append(Rect( 19465, 31365, 19635, 36635 ))
-  rects.append(Rect( 14025, 24960, 14195, 25415 ))
-  rects.append(Rect( 19465, 25245, 19635, 31535 ))
-  rects.append(Rect( 14025, 24960, 14195, 25415 ))
-  rects.append(Rect( 24565, 25245, 24735, 36860 ))
-
-  rects.append(Rect( 19480, 36480, 24720, 36620 ))
-  rects.append(Rect( 14040, 25260, 19620, 25400 ))
-  rects.append(Rect( 14040, 25260, 24720, 25400 ))
+  rects.append(Rect(15830, 11595, 16110, 12545))
 
 
   """
