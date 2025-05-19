@@ -37,6 +37,8 @@ adjLayer = {
 layerWidth = dict()
 layerSpacing = {'li1': 170, 'met1': 140, 'met2': 140, 'met3': 300, 'met4': 300, 'met5': 1600}
 
+VIA_COST = 10
+OBSTS_COST = 1000
 VERBOSE = False
 LOG_FILE = "router_debug.log"
 import datetime
@@ -52,10 +54,13 @@ class Vertex:
     self._nbrs = []
     self._g = None
     self._h = None
-    self._costs = []
+    self._costs = dict() ## Cost of edge for each nbr id
 
   def cost(self):
-    return self._g + self._h
+    # return self._g + self._h
+    total_cost = sum(self._costs.values()) + self._g + self._h
+    return total_cost
+  
   def __lt__(self, r):
     if self.cost() == r.cost():
       return self._g > r._g
@@ -276,13 +281,13 @@ class Net:
     ## Add source and sink vertices at li1 and met1 layers
 
     self.add_vertices_to_tracks(tr_dict, vertices)
-    self.connect_vertices_on_tracks(tr_dict, vertices)
+    self.connect_vertices_on_tracks(tr_dict, vertices, layerTrees)
           
     #plot_vertices(tr_dict, self._name)
     # print_vertices(vertices)
     return tr_dict, vertices
 
-  def connect_vertices_on_tracks(self, tr_dict, vertices):
+  def connect_vertices_on_tracks(self, tr_dict, vertices, layerTrees):
     for layer in layerColors:
       ## Add via edges with the layer above
       if layer not in tr_dict: break
@@ -290,12 +295,23 @@ class Net:
         tr_vertices = [v for k,v in sorted(tr_dict[layer][ct].items())]
         for i,v in enumerate(tr_vertices):
           if i == 0:
-            vertices[v]._nbrs.append(tr_vertices[i+1])
+            nid = tr_vertices[i+1]
+            vertices[v]._nbrs.append(nid)            
+            nObsts = get_obstacles(vertices[v], vertices[nid], layer, layerTrees)
+            vertices[v]._costs[nid] = nObsts*OBSTS_COST
           elif i == len(tr_vertices) - 1:
-            vertices[v]._nbrs.append(tr_vertices[i-1])
+            pid = tr_vertices[i-1]
+            vertices[v]._nbrs.append(pid)
+            obst_cost = vertices[pid]._costs[v]
+            vertices[v]._costs[pid] = obst_cost
           else:
-            vertices[v]._nbrs.append(tr_vertices[i+1])
-            vertices[v]._nbrs.append(tr_vertices[i-1])
+            nid, pid = tr_vertices[i+1], tr_vertices[i-1]
+            vertices[v]._nbrs.append(nid)
+            vertices[v]._nbrs.append(pid)
+            nObsts = get_obstacles(vertices[v], vertices[nid], layer, layerTrees)
+            vertices[v]._costs[nid] = nObsts*OBSTS_COST
+            pObsts_cost = vertices[pid]._costs[v]
+            vertices[v]._costs[pid] = pObsts_cost
 
   def add_vertices_to_tracks(self, tr_dict, vertices):
     for layer in layerColors:
@@ -311,7 +327,9 @@ class Net:
               av = Vertex(atr, ct, adj_lr, len(vertices))
               vertices.append(av)
               cv._nbrs.append(av._id)
+              cv._costs[av._id] = VIA_COST
               av._nbrs.append(cv._id)
+              av._costs[cv._id] = VIA_COST
               tr_dict[adj_lr][atr][ct] = av._id
             else:
               cv = Vertex(atr, ct, layer, len(vertices))
@@ -319,7 +337,9 @@ class Net:
               av = Vertex(atr, ct, adj_lr, len(vertices))
               vertices.append(av)
               cv._nbrs.append(av._id)
+              cv._costs[av._id] = VIA_COST
               av._nbrs.append(cv._id)
+              av._costs[cv._id] = VIA_COST
               tr_dict[layer][ct][atr] = cv._id
               tr_dict[adj_lr][atr][ct] = av._id
           else:
@@ -328,7 +348,9 @@ class Net:
               av = Vertex(ct, atr, adj_lr, len(vertices))
               vertices.append(av)
               cv._nbrs.append(av._id)
+              cv._costs[av._id] = VIA_COST
               av._nbrs.append(cv._id)
+              av._costs[cv._id] = VIA_COST
               tr_dict[adj_lr][atr][ct] = av._id
             else:
               cv = Vertex(ct, atr, layer, len(vertices))
@@ -336,7 +358,9 @@ class Net:
               av = Vertex(ct, atr, adj_lr, len(vertices))
               vertices.append(av)
               cv._nbrs.append(av._id)
+              cv._costs[av._id] = VIA_COST
               av._nbrs.append(cv._id)
+              av._costs[cv._id] = VIA_COST
               tr_dict[layer][ct][atr] = cv._id
               tr_dict[adj_lr][atr][ct] = av._id   
 
@@ -400,25 +424,7 @@ class Net:
         xh, yh = max(x1, x2) + b, max(y1, y2) + b
         r = Rect(xl, yl, xh, yh)
         self._sol.append((u.layer, r))
-        
-        
-      # for i in range(len(path)):
-      #   u = path[i]
-      #   v = path[i+1]
-      #   xl = xh = yh = yl = 0
-      #   if layerOrient[u.layer] == 'HORIZONTAL':
-      #     while u.layer == v.layer and u.y == v.y:
-      #       i+=1
-      #       v = path[i]
 
-      #   if u.layer == v.layer:
-      #     b = layerWidth[u.layer] // 2
-      #     xl = min(u.x, v.x) - b
-      #     yl = min(u.y, v.y) - b
-      #     xh = max(u.x, v.x) + b
-      #     yh = max(u.y, v.y) + b
-      #     r = Rect(xl, yl, xh, yh)
-      #     self._sol.append((u.layer, r))
 
   def getpath(self, srcs, vertices):
     ## Get the source and target vertices
@@ -615,6 +621,7 @@ def markUnusedPins(nets, insts, pins, obsts):
 
 def buildTree(nets, insts, obsts):
   lT = {layer: rtree.index.Index() for layer in layerColors}
+  lT['count'] = 0
   obstid = len(nets)
 
   count = 0
@@ -635,6 +642,7 @@ def buildTree(nets, insts, obsts):
         for r in rects:
           lT[layer].insert(count, (r.ll.x, r.ll.y, r.ur.x, r.ur.y), obj=net._id)
           count += 1
+    lT['count'] = count
 
   return lT
 
@@ -743,18 +751,65 @@ def printguides(nets):
       for r in rects:
         printlog(f"    Rect: {r.ll.x}, {r.ll.y}, {r.ur.x}, {r.ur.y}", False)
 
-
 def add_net_shapes(net, netDEF):
   for r in net._sol:
     layer, rect = r
     netDEF.addRect(layer, rect.ll.x, rect.ll.y, rect.ur.x, rect.ur.y)  
+
+def update_rtree(layerTrees, shapes, netid):
+  count = layerTrees['count']
+  for layer, rect in shapes:
+    layerTrees[layer].insert(count, (rect.ll.x, rect.ll.y, rect.ur.x, rect.ur.y), obj=netid)
+    count += 1
+  layerTrees['count'] = count
+  # printlog(f"Layer: {layer} Rect: {r.ll.x}, {r.ll.y}, {r.ur.x}, {r.ur.y}", True)
+
+def get_shapes_within_guides(layerTrees, guides):
+  # Create new rtree for filtered shapes
+  filtered_trees = {layer: rtree.index.Index() for layer in layerColors}
+  filtered_trees['count'] = 0
+  count = 0
+
+  # For each layer in the guides
+  for layer, guide_rects in guides.items():
+    # For each guide rectangle
+    for guide in guide_rects:
+      # Get all shapes that intersect with guide bbox
+      intersecting = layerTrees[layer].intersection(
+        (guide.ll.x, guide.ll.y, guide.ur.x, guide.ur.y), 
+        objects=True
+      )
+      
+      # Add intersecting shapes to filtered tree
+      for item in intersecting:
+        bb = item.bbox
+        filtered_trees[layer].insert(
+          count,
+          (bb[0], bb[1], bb[2], bb[3]),
+          obj=item.object
+        )
+        count += 1
+            
+  filtered_trees['count'] = count
+  return filtered_trees
+
+def get_obstacles(src, tgt, layer, lT):
+  # Get the bounding box of the source and target vertices
+  hw = layerWidth[layer] // 2
+  s = layerSpacing[layer]
+  b = hw + s
+  edge = Rect(min(src.x, tgt.x) - s, min(src.y, tgt.y) - s, max(src.x, tgt.x) + s, max(src.y, tgt.y) + s)
+  nObsts = lT[layer].count((edge.ll.x, edge.ll.y, edge.ur.x, edge.ur.y))
+  return nObsts
 
 def route_nets(nets: list[Net], layerTrees, tracks):
   ids = [355] # 1: N1_d, 8:N3, 9:N3_d, 15: net1, 6: _06_, 4: N22_d, 95: N738, 312: net30, 355: net7
   for net in nets:
     # if net._id in ids:
       printlog(f"Routing net: {net._name} ID: {net._id}", True)
-      net.route(layerTrees, tracks)
+      nrt = get_shapes_within_guides(layerTrees, net._guides) # Get shapes within the net guide regions
+      net.route(nrt, tracks)
+      update_rtree(layerTrees, net._sol, net._id)
 
 def writeDEF(netDict, ideff, odef):
   names = ["net7"]
@@ -860,7 +915,7 @@ def detailed_route(idef, ilef, guide, odef):
 
 if __name__ == "__main__":
   # Example usage
-  ckt = "add5"
+  ckt = "c432"
   idef = f"def/{ckt}.def"
   ilef = f"lef/sky130.lef"
   guide = f"gr/{ckt}.guide"

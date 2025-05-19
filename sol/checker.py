@@ -274,11 +274,11 @@ def checkSpacing(layerTrees, nets, insts):
             if overlaps(rb, nbr.bbox):
               numViolations += 1
               if nbr.object < len(nets):
-                print(f"Spacing violation : [{{'net1' : '{net._name}', 'shape' : ({layer}, [{r.ll.x}, {r.ll.y}, {r.ur.x}, {r.ur.y}])}}, {{'net2' : '{nets[nbr.object]._name}', 'shape' : ({layer}, {[round(i) for i in nbr.bbox]})}}]")
+                # print(f"Spacing violation : [{{'net1' : '{net._name}', 'shape' : ({layer}, [{r.ll.x}, {r.ll.y}, {r.ur.x}, {r.ur.y}])}}, {{'net2' : '{nets[nbr.object]._name}', 'shape' : ({layer}, {[round(i) for i in nbr.bbox]})}}]")
                 spacingViol.append(Rect(rb.ll.x, rb.ll.y, rb.ur.x, rb.ur.y))
               elif nbr.object == len(nets):
                 numViolations += 1
-                print(f"Spacing violation : [{{'net1' : '{net._name}', 'shape' : ({layer}, [{r.ll.x}, {r.ll.y}, {r.ur.x}, {r.ur.y}])}}, {{'net2' : 'obst', 'shape' : ({layer}, {[round(i) for i in nbr.bbox]})}}]")
+                # print(f"Spacing violation : [{{'net1' : '{net._name}', 'shape' : ({layer}, [{r.ll.x}, {r.ll.y}, {r.ur.x}, {r.ur.y}])}}, {{'net2' : 'obst', 'shape' : ({layer}, {[round(i) for i in nbr.bbox]})}}]")
                 spacingViol.append(Rect(rb.ll.x, rb.ll.y, rb.ur.x, rb.ur.y))
               else:
                 assert(0)
@@ -341,7 +341,7 @@ def checkConnectivity(layerTrees, nets, insts):
 def check(nets, insts, obsts):
   layerTrees = buildTree(nets, insts, obsts)
   nViols, violations = 0, ([],[])
-  # nViols, violations = checkSpacing(layerTrees, nets, insts)
+  nViols, violations = checkSpacing(layerTrees, nets, insts)
   print(f"Total number of spacing violations : {nViols}")
 
   nOpens = checkConnectivity(layerTrees, nets, insts)
