@@ -362,7 +362,7 @@ class Net:
     trdict, vertices = self.create_graph(layerTrees, tracks)
     srcs = self.get_src_tgt_vertices(trdict, vertices, tracks)
     printlog(f"Source vertices", True)
-    print_sources(srcs, vertices)
+    # print_sources(srcs, vertices)
     ## Call astar for each source and target pair and get the path
     paths = self.getpath(srcs, vertices)
     # print_path(paths)
@@ -395,7 +395,7 @@ class Net:
 
         if x1 == x2 and y1 == y2: continue  
         
-        b = layerWidth[u.layer] // 2
+        b = layerWidth[u.layer] // 2 + 20
         xl, yl = min(x1, x2) - b, min(y1, y2) - b
         xh, yh = max(x1, x2) + b, max(y1, y2) + b
         r = Rect(xl, yl, xh, yh)
@@ -524,22 +524,32 @@ class Net:
     return srcs     
 
 def find_tracks_y(layer, rects, trdict):
-  b = layerWidth[layer] // 2
+  b = layerWidth[layer] // 2 if layer != 'li' else layerWidth['met1'] // 2  
+  rect, tr = None, None
   for r in rects:
     for pos in trdict[layer]:
       if r.ll.x <= pos - b <= r.ur.x or r.ll.x <= pos + b <= r.ur.x:
-        printlog(f"XP: {pos} Rect: {r.ll.x}, {r.ll.y}, {r.ur.x}, {r.ur.y} Layer: {layer} Tracks: {trdict[layer].keys()}", True)        
-        return r, pos
-  return None, None
+        # printlog(f"XP: {pos} Rect: {r.ll.x}, {r.ll.y}, {r.ur.x}, {r.ur.y} Layer: {layer} Tracks: {trdict[layer].keys()}", True)        
+        rect, tr = r, pos
+
+  if rect is not None:
+    printlog(f"XP: {tr} Rect: {rect.ll.x}, {rect.ll.y}, {rect.ur.x}, {rect.ur.y} Layer: {layer} Tracks: {trdict[layer].keys()}", False)   
+  
+  return rect, tr
 
 def find_tracks_x(layer, rects, trdict):
-  b = layerWidth[layer] // 2
+  b = layerWidth[layer] // 2 if layer != 'li' else layerWidth['met1'] // 2  
+  rect, tr = None, None
   for r in rects:
     for pos in trdict[layer]:
       if r.ll.y <= pos - b <= r.ur.y or r.ll.y <= pos + b <= r.ur.y:
-        printlog(f"YP: {pos} Rect: {r.ll.x}, {r.ll.y}, {r.ur.x}, {r.ur.y} Layer: {layer} Tracks: {trdict[layer].keys()}", True)        
-        return r, pos
-  return None, None
+        # printlog(f"YP: {pos} Rect: {r.ll.x}, {r.ll.y}, {r.ur.x}, {r.ur.y} Layer: {layer} Tracks: {trdict[layer].keys()}", True)        
+        rect, tr = r, pos
+
+  if rect is not None:
+    printlog(f"XP: {tr} Rect: {rect.ll.x}, {rect.ll.y}, {rect.ur.x}, {rect.ur.y} Layer: {layer} Tracks: {trdict[layer].keys()}", False)     
+  
+  return rect, tr
 
 def get_bbox(rects):
   xl = yl = xh = yh = 0
@@ -740,14 +750,14 @@ def add_net_shapes(net, netDEF):
     netDEF.addRect(layer, rect.ll.x, rect.ll.y, rect.ur.x, rect.ur.y)  
 
 def route_nets(nets: list[Net], layerTrees, tracks):
-  ids = [4] # 1: N1_d, 8:N3, 9:N3_d, 15: net1, 6: _06_, 4: N22_d
+  ids = [355] # 1: N1_d, 8:N3, 9:N3_d, 15: net1, 6: _06_, 4: N22_d, 95: N738, 312: net30, 355: net7
   for net in nets:
     # if net._id in ids:
       printlog(f"Routing net: {net._name} ID: {net._id}", True)
       net.route(layerTrees, tracks)
 
 def writeDEF(netDict, ideff, odef):
-  names = ["N22_d"]
+  names = ["net7"]
 
   # for name in netDict:
   #   if len(netDict[name]._pins.keys()) > 2:
@@ -772,11 +782,18 @@ def plot_rectangles(color='blue', alpha=0.5, title="Rectangles"):
 
   rects = []
 
-  rects.append(Rect(15725, 24735, 15985, 25415))
-  rects.append(Rect(15725, 25415, 15895, 26615))
-  rects.append(Rect(15725, 26615, 15985, 26945))
 
-  rects.append(Rect(15830, 11595, 16110, 12545))
+  rects.append(Rect(91165, 12440, 91435, 13345))
+  rects.append(Rect(91165, 11640, 91335, 12440))
+  rects.append(Rect(91165, 11135, 91425, 11640))
+
+  rects.append(Rect(67810, 14655, 68090, 15605))
+
+  # rects.append(Rect(91205, 11302, 91375, 15215))
+  # rects.append(Rect(68100, 15060, 91360, 15200))
+
+  rects.append(Rect(91205, 11302, 91375, 15215))
+  rects.append(Rect(68100, 15060, 91360, 15200))  
 
 
   """

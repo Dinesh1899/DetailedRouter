@@ -332,7 +332,7 @@ def checkConnectivity(layerTrees, nets, insts):
 
     if len(G.nodes()):
       if not nx.is_connected(G):
-        # print(f"Open 'net' : '{net._name}'")
+        print(f"Open 'net' : '{net._name}'")
         numOpens += 1
 
   return numOpens
