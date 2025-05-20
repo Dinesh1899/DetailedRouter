@@ -1,5 +1,4 @@
 import math
-from typing import OrderedDict
 import LEFDEFParser
 from LEFDEFParser import Rect
 import rtree
@@ -42,7 +41,6 @@ VIA_COST = 10
 OBSTS_COST = 100
 VERBOSE = False
 LOG_FILE = "router_debug.log"
-import datetime
 
 
 class Vertex:
