@@ -37,8 +37,8 @@ adjLayer = {
 layerWidth = dict()
 layerSpacing = {'li1': 170, 'met1': 140, 'met2': 140, 'met3': 300, 'met4': 300, 'met5': 1600}
 
-VIA_COST = 10
-OBSTS_COST = 100
+VIA_COST = 5
+OBSTS_COST = 1000
 VERBOSE = False
 LOG_FILE = "router_debug.log"
 
@@ -227,6 +227,8 @@ def plot_vertices(tr_dict, net_name):
   plt.savefig(f'ref/vertices_{net_name}.png')
   plt.close()
 
+def li1_cost(layer):
+  return 100000 if layer == 'li1' else 0
 
 # wrapper Net class that has the actual pins at the transformed coordinates
 class Net:
@@ -297,7 +299,7 @@ class Net:
             nid = tr_vertices[i+1]
             vertices[v]._nbrs.append(nid)            
             nObsts = get_obstacles(vertices[v], vertices[nid], layer, layerTrees)
-            vertices[v]._costs[nid] = nObsts*OBSTS_COST
+            vertices[v]._costs[nid] = nObsts*OBSTS_COST + li1_cost(layer)
           elif i == len(tr_vertices) - 1:
             pid = tr_vertices[i-1]
             vertices[v]._nbrs.append(pid)
@@ -308,7 +310,7 @@ class Net:
             vertices[v]._nbrs.append(nid)
             vertices[v]._nbrs.append(pid)
             nObsts = get_obstacles(vertices[v], vertices[nid], layer, layerTrees)
-            vertices[v]._costs[nid] = nObsts*OBSTS_COST
+            vertices[v]._costs[nid] = nObsts*OBSTS_COST + li1_cost(layer)
             pObsts_cost = vertices[pid]._costs[v]
             vertices[v]._costs[pid] = pObsts_cost
 
@@ -418,7 +420,7 @@ class Net:
 
         # if x1 == x2 and y1 == y2: continue  
         
-        b = layerWidth[u.layer] // 2 + 20
+        b = layerWidth[u.layer] // 2
         xl, yl = min(x1, x2) - b, min(y1, y2) - b
         xh, yh = max(x1, x2) + b, max(y1, y2) + b
         r = Rect(xl, yl, xh, yh)
@@ -972,12 +974,12 @@ def detailed_route(idef, ilef, guide, odef):
 
 if __name__ == "__main__":
   # Example usage
-  ckt = "c6288"
+  ckt = "add5"
   idef = f"def/{ckt}.def"
   ilef = f"lef/sky130.lef"
   guide = f"gr/{ckt}.guide"
   odef = f"sol/{ckt}_out.def"    
-  VERBOSE = True
+  VERBOSE = False
   LOG_FILE = f"router_{ckt}.log"
   printlog(f"Start routing {ckt}", True)
   printlog(f"                     ", True)
