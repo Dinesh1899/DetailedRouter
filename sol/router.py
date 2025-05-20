@@ -131,7 +131,7 @@ def astar(V, s, t):
       break
     for vid in u._nbrs:
       v = V[vid]
-      newcost = u._g + dist(u, v) # + u._costs[vid]
+      newcost = u._g + dist(u, v) + u._costs[vid]
       if newcost < v._g:
         v._g, v._parent = newcost, u
         if v in Q:
@@ -426,18 +426,62 @@ class Net:
         r = Rect(xl, yl, xh, yh)
         self._sol.append((u.layer, r))
 
-
   def getpath(self, srcs, vertices):
-    ## Get the source and target vertices
-    paths = list()
-    for i in range(len(srcs)):
-      for j in range(i+1, len(srcs)):
-        s = srcs[i]
-        t = srcs[j]
-        path = astar(vertices, s, t)
+    ## Get MST edges using Prim's algorithm
+    paths = []
+    n = len(srcs)
+    if n == 0:
+      return paths
+      
+    # Initialize MST data structures  
+    used = [False] * n
+    min_e = [math.inf] * n  # Minimum edge weight to MST
+    sel_e = [None] * n         # Selected vertices
+    min_e[0] = 0
+    
+    # Cost function between two vertices
+    def get_cost(u, v):
+      return dist(u, v)
+    
+    # Run Prim's algorithm
+    for i in range(n):
+      # Find vertex with minimum edge weight
+      v = -1
+      for j in range(n):
+        if not used[j] and (v == -1 or min_e[j] < min_e[v]):
+          v = j
+      
+      if min_e[v] == math.inf:
+        break
+          
+      used[v] = True
+      
+      # If we have a selected vertex, add the path
+      if sel_e[v] is not None:
+        path = astar(vertices, srcs[sel_e[v]], srcs[v])
         paths.append(path)
-        #print_sources(path, vertices)
+      
+      # Update minimum edges for unused vertices
+      for to in range(n):
+        if not used[to]:
+          cost = get_cost(srcs[v], srcs[to])
+          if cost < min_e[to]:
+            min_e[to] = cost
+            sel_e[to] = v
+            
     return paths
+
+  # def getpath(self, srcs, vertices):
+  #   ## Get the source and target vertices
+  #   paths = list()
+  #   for i in range(len(srcs)):
+  #     for j in range(i+1, len(srcs)):
+  #       s = srcs[i]
+  #       t = srcs[j]
+  #       path = astar(vertices, s, t)
+  #       paths.append(path)
+  #       #print_sources(path, vertices)
+  #   return paths
 
   def get_src_tgt_vertices(self, trdict, vertices, tracks):
     ## Iterate through all pins of the net
@@ -916,14 +960,14 @@ def detailed_route(idef, ilef, guide, odef):
     netDict[net._name] = net
   
   sort_nets(nets)
-  get_pins_data(nets)
+  # get_pins_data(nets)
   # printnets(nets)
   parse_guides(netDict, guide)
   # printguides(nets)
   
-  # layerTrees = buildTree(nets, insts, obsts)
-  # route_nets(nets, layerTrees, tracks)
-  # writeDEF(netDict, ideff, odef)
+  layerTrees = buildTree(nets, insts, obsts)
+  route_nets(nets, layerTrees, tracks)
+  writeDEF(netDict, ideff, odef)
   # plot_rectangles()
   return None
 
