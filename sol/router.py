@@ -1,3 +1,4 @@
+import math
 from typing import OrderedDict
 import LEFDEFParser
 from LEFDEFParser import Rect
@@ -38,7 +39,7 @@ layerWidth = dict()
 layerSpacing = {'li1': 170, 'met1': 140, 'met2': 140, 'met3': 300, 'met4': 300, 'met5': 1600}
 
 VIA_COST = 10
-OBSTS_COST = 1000
+OBSTS_COST = 100
 VERBOSE = False
 LOG_FILE = "router_debug.log"
 import datetime
@@ -57,9 +58,9 @@ class Vertex:
     self._costs = dict() ## Cost of edge for each nbr id
 
   def cost(self):
-    # return self._g + self._h
-    total_cost = sum(self._costs.values()) + self._g + self._h
-    return total_cost
+    return self._g + self._h
+    # total_cost = sum(self._costs.values()) + self._g + self._h
+    # return total_cost
   
   def __lt__(self, r):
     if self.cost() == r.cost():
@@ -117,7 +118,7 @@ class priority_queue:
 
 def astar(V, s, t):
   for v in V:
-    v._g, v._h, v._parent = 10000000, dist(v,t), None
+    v._g, v._h, v._parent = math.inf, dist(v,t), None
   s._g = 0
   s._h = dist(s,t)
   Q = priority_queue()
@@ -130,7 +131,7 @@ def astar(V, s, t):
       break
     for vid in u._nbrs:
       v = V[vid]
-      newcost = u._g + dist(u, v)
+      newcost = u._g + dist(u, v) # + u._costs[vid]
       if newcost < v._g:
         v._g, v._parent = newcost, u
         if v in Q:
@@ -417,7 +418,7 @@ class Net:
             i+=1
             v = path[i]
 
-        if x1 == x2 and y1 == y2: continue  
+        # if x1 == x2 and y1 == y2: continue  
         
         b = layerWidth[u.layer] // 2 + 20
         xl, yl = min(x1, x2) - b, min(y1, y2) - b
@@ -462,7 +463,9 @@ class Net:
               vid = v
           pinv._nbrs.append(vid)
           vertices[vid]._nbrs.append(pinv._id)
-          srcs.append(vertices[pinv._id])            
+          srcs.append(vertices[pinv._id])
+          vertices[vid]._costs[pinv._id] = 0
+          pinv._costs[vid] = 0            
         else:
           r, yp = find_tracks_x(layer, rects, trdict)
           if yp is None: 
@@ -482,51 +485,9 @@ class Net:
           pinv._nbrs.append(vid)
           vertices[vid]._nbrs.append(pinv._id)
           srcs.append(vertices[pinv._id])           
+          vertices[vid]._costs[pinv._id] = 0
+          pinv._costs[vid] = 0    
 
-
-
-        # rect = [rects[0]]# [get_bbox(rects)]
-        # for r in rect:
-        #   ## Get the source and target vertices
-        #   if layerOrient[layer] == 'HORIZONTAL':
-        #     tr_data = tracks[layer][0]
-        #     ny = (r.ur.y - tr_data.x) // tr_data.step
-        #     yp  = tr_data.x + ny * tr_data.step
-        #     tr_vertices = trdict[layer][yp]
-        #     xc = r.ll.x + (r.ur.x - r.ll.x) // 2
-        #     pinv = Vertex(xc, yp, layer, len(vertices))
-        #     vertices.append(pinv)
-        #     min_dist = 10000000
-        #     vid = None
-        #     ## Assume all pins have some overlapping vertices
-        #     for k, v in tr_vertices.items():
-        #       if abs(k - xc) < min_dist:
-        #         min_dist = abs(k - xc)
-        #         vid = v
-        #     pinv._nbrs.append(vid)
-        #     vertices[vid]._nbrs.append(pinv._id)
-        #     srcs.append(vertices[pinv._id])
-        #   else:
-        #     tr_data = tracks[layer][1]
-        #     nx = (r.ur.x - tr_data.x) // tr_data.step
-        #     xp  = tr_data.x + nx * tr_data.step
-        #     printlog(f"XP: {xp} Rect: {r.ll.x}, {r.ll.y}, {r.ur.x}, {r.ur.y} Layer: {layer} Tracks: {trdict[layer].keys()}", True)
-        #     if xp not in trdict[layer]:
-        #       xp = min(trdict[layer].keys())
-        #     tr_vertices = trdict[layer][xp]
-        #     yc = r.ll.y + (r.ur.y - r.ll.y) // 2
-        #     pinv = Vertex(xp, yc, layer, len(vertices))
-        #     vertices.append(pinv)
-        #     min_dist = 10000000
-        #     vid = None
-        #     ## Assume all pins have some overlapping vertices
-        #     for k, v in tr_vertices.items():
-        #       if abs(k - yc) < min_dist:
-        #         min_dist = abs(k - yc)
-        #         vid = v
-        #     pinv._nbrs.append(vid)
-        #     vertices[vid]._nbrs.append(pinv._id)
-        #     srcs.append(vertices[pinv._id])
     return srcs     
 
 def find_tracks_y(layer, rects, trdict):
@@ -803,7 +764,7 @@ def get_obstacles(src, tgt, layer, lT):
   return nObsts
 
 def route_nets(nets: list[Net], layerTrees, tracks):
-  ids = [355] # 1: N1_d, 8:N3, 9:N3_d, 15: net1, 6: _06_, 4: N22_d, 95: N738, 312: net30, 355: net7
+  ids = [7] # 1: N1_d, 8:N3, 9:N3_d, 15: net1, 6: _06_, 4: N22_d, 95: N738, 312: net30, 355: net7, 7: _07_
   for net in nets:
     # if net._id in ids:
       printlog(f"Routing net: {net._name} ID: {net._id}", True)
@@ -812,7 +773,7 @@ def route_nets(nets: list[Net], layerTrees, tracks):
       update_rtree(layerTrees, net._sol, net._id)
 
 def writeDEF(netDict, ideff, odef):
-  names = ["net7"]
+  names = ["_07_"]
 
   # for name in netDict:
   #   if len(netDict[name]._pins.keys()) > 2:
@@ -836,20 +797,48 @@ def plot_rectangles(color='blue', alpha=0.5, title="Rectangles"):
   import matplotlib.patches as patches
 
   rects = []
+  rects1 = []
+  rects2 = []
+  rects3 = []
 
+  rects.append(Rect(7925, 12440, 8195, 13345))
+  rects.append(Rect(8015, 11640, 8195, 12440))
+  rects.append(Rect(7935, 11135, 8195, 11640))
+  rects.append(Rect(10265, 20435, 10620, 20995))
+  rects.append(Rect(9755, 14995, 10090, 15265))
+  rects.append(Rect(11640, 17315, 11925, 17975))
 
-  rects.append(Rect(91165, 12440, 91435, 13345))
-  rects.append(Rect(91165, 11640, 91335, 12440))
-  rects.append(Rect(91165, 11135, 91425, 11640))
+  rects1.append(Rect(10265, 20465, 10475, 20820))
+  rects1.append(Rect(7885, 11282, 8095, 11495))
+  rects1.append(Rect(7885, 11282, 8095, 11495))
+  rects1.append(Rect(11625, 17405, 11835, 17750))
+  rects1.append(Rect(7885, 11282, 8095, 11495))
+  rects1.append(Rect(10265, 20465, 10475, 20820))
+  rects1.append(Rect(11625, 17405, 11835, 17750))
+  rects1.append(Rect(10265, 20465, 10475, 20820))
+  rects1.append(Rect(11625, 17405, 11835, 17750))
+  rects2.append(Rect(10260, 20480, 10460, 20660 ))
+  rects2.append(Rect(7900, 11300, 10440, 11480 ))
+  rects2.append(Rect(9800, 15040, 10120, 15220 ))
+  rects2.append(Rect(7900, 11300, 9980 ,11480 ))
+  rects2.append(Rect(11180, 16740, 11820, 16920 ))
+  rects2.append(Rect(7900, 11300, 11360, 11480 ))
+  rects2.append(Rect(9940, 15040, 10440, 15220 ))
+  rects2.append(Rect(10260, 20480, 10460, 20660 ))
+  rects2.append(Rect(10280, 20480, 11820, 20660 ))
+  rects2.append(Rect(10720, 16740, 11820, 16920 ))
+  rects2.append(Rect(9940, 15040, 10900, 15220 ))
+  rects3.append(Rect(10260, 11300, 10440, 20660 ))
+  rects3.append(Rect(9800 ,11300, 9980 ,15220 ))
+  rects3.append(Rect(11640, 16740, 11820, 17600 ))
+  rects3.append(Rect(11180, 11300, 11360, 16920 ))
+  rects3.append(Rect(10260, 15040, 10440, 20660 ))
+  rects3.append(Rect(11640, 17420, 11820, 20660 ))
+  rects3.append(Rect(11640, 16740, 11820, 17600 ))
+  rects3.append(Rect(10720, 15040, 10900, 16920 ))
 
-  rects.append(Rect(67810, 14655, 68090, 15605))
-
-  # rects.append(Rect(91205, 11302, 91375, 15215))
-  # rects.append(Rect(68100, 15060, 91360, 15200))
-
-  rects.append(Rect(91205, 11302, 91375, 15215))
-  rects.append(Rect(68100, 15060, 91360, 15200))  
-
+  allrects = [rects, rects1, rects2, rects3]
+  colors = ['blue', 'red', 'green', 'yellow']
 
   """
   Plot a list of rectangles
@@ -861,18 +850,20 @@ def plot_rectangles(color='blue', alpha=0.5, title="Rectangles"):
   """
   fig, ax = plt.subplots()
   
-  # Plot each rectangle
-  for rect in rects:
-    width = rect.ur.x - rect.ll.x
-    height = rect.ur.y - rect.ll.y
-    
-    rect_patch = patches.Rectangle(
-      (rect.ll.x, rect.ll.y),
-      width, height,
-      facecolor=color,
-      alpha=alpha
-    )
-    ax.add_patch(rect_patch)
+  # Plot each rectangle 
+  for i, rects in enumerate(allrects):
+    color = colors[i]
+    for rect in rects:
+      width = rect.ur.x - rect.ll.x
+      height = rect.ur.y - rect.ll.y
+      
+      rect_patch = patches.Rectangle(
+        (rect.ll.x, rect.ll.y),
+        width, height,
+        facecolor=color,
+        alpha=alpha
+      )
+      ax.add_patch(rect_patch)
   
   # Update plot limits to show all rectangles
   ax.autoscale()
@@ -882,6 +873,29 @@ def plot_rectangles(color='blue', alpha=0.5, title="Rectangles"):
   ax.set_title(title)
   
   plt.show()
+
+def get_pins_data(nets):
+  # Dictionary to store count of nets with specific number of pins
+  pin_stats = {}
+  
+  for net in nets:
+    num_pins = len(net._pins)
+    pin_stats[num_pins] = pin_stats.get(num_pins, 0) + 1
+  
+  # Print statistics
+  printlog("Net Pin Statistics:", True)
+  printlog("-------------------", True)
+  for num_pins in sorted(pin_stats.keys()):
+    printlog(f"Nets with {num_pins} pins: {pin_stats[num_pins]}", True)
+  printlog("-------------------", True)
+  
+  # Calculate percentage distribution
+  total_nets = len(nets)
+  printlog("Percentage Distribution:", True)
+  for num_pins in sorted(pin_stats.keys()):
+    percentage = (pin_stats[num_pins] / total_nets) * 100
+    printlog(f"{num_pins} pins: {percentage:.2f}%", True)
+  printlog("-------------------", True)
 
 
 ## Detail Router
@@ -902,20 +916,21 @@ def detailed_route(idef, ilef, guide, odef):
     netDict[net._name] = net
   
   sort_nets(nets)
+  get_pins_data(nets)
   # printnets(nets)
   parse_guides(netDict, guide)
   # printguides(nets)
   
-  layerTrees = buildTree(nets, insts, obsts)
-  route_nets(nets, layerTrees, tracks)
-  writeDEF(netDict, ideff, odef)
+  # layerTrees = buildTree(nets, insts, obsts)
+  # route_nets(nets, layerTrees, tracks)
+  # writeDEF(netDict, ideff, odef)
   # plot_rectangles()
   return None
 
 
 if __name__ == "__main__":
   # Example usage
-  ckt = "c432"
+  ckt = "c6288"
   idef = f"def/{ckt}.def"
   ilef = f"lef/sky130.lef"
   guide = f"gr/{ckt}.guide"
