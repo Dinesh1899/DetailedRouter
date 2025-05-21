@@ -139,4 +139,32 @@ When using the `-p` option with checker.py:
   - Layerwise tracks and metal shapes
   - DRC violations (if any)
 
+## Debug Logging
+
+To enable detailed debug logs:
+1. Open router.py
+2. Find line containing `VERBOSE = False` (around line 994)
+3. Change it to `VERBOSE = True`
+4. Uncomment the required printlog and other print methods
+5. Make sure the verbose argument(2nd argument) of all the desired printlog statements is set to `True` 
+6. Logs will be generated in `logs/router_<def_name>.log`
+
+## Running Test Examples
+
+The repository includes example circuits in `def/` directory along with global routed guides in `guide/` directory. You can run all examples using the provided shell scripts:
+
+1. Run detailed router on all examples:
+```bash
+chmod +x route.sh
+./route.sh
+
+2. Check DRC and connectivity for all routed solutions:
+```bash
+chmod +x check.sh
+./check.sh
+
+The scripts will:
+- Route all the example circuits using router.py
+- Generate output DEF files in outputs/ directory
+- Run DRC/connectivity checks on all the def files generated for all the examples using checker.py
 
