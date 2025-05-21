@@ -90,7 +90,7 @@ python3 router.py -l <lef_file> -i <input_def> -g <guide_file> -o <output_def>
 
 Example:
 ```bash
-python3 router.py -l lef/sky130.lef -i def/c17.def -g gr/c17.guide -o sol/c17_out.def
+python3 router.py -l lef/sky130.lef -i def/c17.def -g gr/c17.guide -o outputs/c17_out.def
 ```
 
 Logs are stored in: `logs/router_<def_name>.log`
@@ -131,9 +131,7 @@ The checker helps ensure:
 When using the `-p` option with checker.py:
 - Generates layer-by-layer routing plots
 - Shows:
-  - Routed wires
-  - Pin locations  
-  - Guide rectangles
+  - Layerwise tracks and metal shapes
   - DRC violations (if any)
 
 Plots are saved in the `plots/` directory.
