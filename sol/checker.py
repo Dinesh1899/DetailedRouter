@@ -441,4 +441,8 @@ if __name__ == '__main__':
   ap.add_argument("-p", "--plot", action='store_true')
   args = ap.parse_args()
   if args.leff != "" and args.ideff != "" and args.odeff != "":
+    import time
+    start_time = time.time()
     loadAndCheck(args.odeff, args.ideff, args.leff, args.plot)
+    end_time = time.time()
+    print(f"Time taken for {args.odeff}: {end_time - start_time:.2f} seconds")    
