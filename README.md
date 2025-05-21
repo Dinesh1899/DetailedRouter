@@ -157,12 +157,12 @@ The repository includes example circuits in `def/` directory along with global r
 ```bash
 chmod +x route.sh
 ./route.sh
-
+```
 2. Check DRC and connectivity for all routed solutions:
 ```bash
 chmod +x check.sh
 ./check.sh
-
+```
 The scripts will:
 - Route all the example circuits using router.py
 - Generate output DEF files in outputs/ directory
