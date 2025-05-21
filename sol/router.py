@@ -973,19 +973,31 @@ def detailed_route(idef, ilef, guide, odef):
 
 
 if __name__ == "__main__":
-  # Example usage
-  ckt = "add5"
-  idef = f"def/{ckt}.def"
-  ilef = f"lef/sky130.lef"
-  guide = f"gr/{ckt}.guide"
-  odef = f"sol/{ckt}_out.def"    
+  
+  import argparse
+
+  ap = argparse.ArgumentParser()
+  ap.add_argument("-l", "--leff", type=str, default="", help='<lef file>')
+  ap.add_argument("-o", "--odeff", type=str, default="", help='<output def file>')
+  ap.add_argument("-i", "--ideff", type=str, default="", help='<input def file>')
+  ap.add_argument("-g", "--guide", type=str, default="", help='<guide file>')  
+  ap.add_argument("-p", "--plot", action='store_true')
+  args = ap.parse_args()
+  # if args.leff != "" and args.ideff != "" and args.odeff != "":
+  #   loadAndCheck(args.odeff, args.ideff, args.leff, args.plot)
+
+  # ckt = "c17"
+  idef = args.ideff # f"def/{ckt}.def"
+  ilef = args.leff # f"lef/sky130.lef"
+  guide = args.guide # f"gr/{ckt}.guide"
+  odef = args.odeff # f"sol/{ckt}_out.def"    
   VERBOSE = False
-  LOG_FILE = f"router_{ckt}.log"
-  printlog(f"Start routing {ckt}", True)
+  LOG_FILE = f"logs/router_{idef}.log"
+  printlog(f"Start routing {idef}", True)
   printlog(f"                     ", True)
   printlog(f"                     ", True)
   printlog(f"                     ", True)
   detailed_route(idef, ilef, guide, odef)
   
-  from checker import loadAndCheck
-  loadAndCheck(odef, idef, ilef, False)
+  # from checker import loadAndCheck
+  # loadAndCheck(odef, idef, ilef, False)
