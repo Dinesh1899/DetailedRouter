@@ -3,3 +3,5 @@ ref/
 *_out.def
 *.log
 sol/__pycache__
+logs/
+outputs/
