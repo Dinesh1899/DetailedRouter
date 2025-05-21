@@ -101,6 +101,11 @@ To verify the routed solution:
 ```bash 
 python3 checker.py -l <lef_file> -i <input_def> -o <output_def> [-p]
 ```
+Example with plotting:
+```bash
+python3 checker.py -l lef/sky130.lef -i def/c17.def -o outputs/c17_out.def
+```
+
 Note:
 - Check <output_def> got generated or not after running the router.py before running the checker
 
@@ -134,4 +139,4 @@ When using the `-p` option with checker.py:
   - Layerwise tracks and metal shapes
   - DRC violations (if any)
 
-Plots are saved in the `plots/` directory.
+
