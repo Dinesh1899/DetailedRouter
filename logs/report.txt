@@ -1,0 +1,51 @@
+Time taken for c17: 0.63 seconds
+Time taken for add5: 2.59 seconds
+Time taken for c432: 19.79 seconds
+Time taken for c499: 45.09 seconds
+Time taken for spm: 39.70 seconds
+Time taken for c6288: 203.77 seconds
+Time taken for c7552: 183.53 seconds
+Checking C17
+Tue May 20 19:30:05 UTC 2025
+Total number of spacing violations : 41
+Total number of nets : 22
+Total number of open nets : 0
+Tue May 20 19:30:05 UTC 2025
+Checking ADD5
+Tue May 20 19:30:07 UTC 2025
+Total number of spacing violations : 225
+Total number of nets : 60
+Total number of open nets : 0
+Tue May 20 19:30:07 UTC 2025
+Checking C432
+Tue May 20 19:30:09 UTC 2025
+Total number of spacing violations : 872
+Total number of nets : 197
+Total number of open nets : 0
+Tue May 20 19:30:10 UTC 2025
+Checking C499
+Tue May 20 19:30:14 UTC 2025
+Total number of spacing violations : 2011
+Total number of nets : 362
+Total number of open nets : 0
+Tue May 20 19:30:16 UTC 2025
+Checking C6288
+Tue May 20 19:30:20 UTC 2025
+Total number of spacing violations : 9689
+Total number of nets : 1525
+Total number of open nets : 0
+Tue May 20 19:30:26 UTC 2025
+Checking C7552
+Tue May 20 19:30:33 UTC 2025
+Total number of spacing violations : 9732
+Open 'net' : 'N10718_q'
+Open 'net' : 'N484_q'
+Total number of nets : 1591
+Total number of open nets : 2
+Tue May 20 19:30:40 UTC 2025
+Checking SPM
+Tue May 20 19:30:47 UTC 2025
+Total number of spacing violations : 1662
+Total number of nets : 307
+Total number of open nets : 0
+Tue May 20 19:30:48 UTC 2025

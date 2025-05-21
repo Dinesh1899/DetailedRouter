@@ -4,7 +4,7 @@ from LEFDEFParser import Rect
 import rtree
 import heapq as hq
 
-import datetime
+# import datetime
 
 # skip decap, fill and tap cells
 skipCells = {"sky130_fd_sc_hd__decap_3", "sky130_fd_sc_hd__decap_4", "sky130_fd_sc_hd__decap_6", "sky130_fd_sc_hd__decap_8",\
@@ -125,7 +125,7 @@ def astar(V, s, t):
   while not Q.empty():
     u = Q.pop()
     if u == t:
-      # printlog(f"Extracted Target ID: {u._id} XY : {u.x}, {u.y} Layer: {u.layer}, Parent: {u._parent}", True) 
+      # # printlog(f"Extracted Target ID: {u._id} XY : {u.x}, {u.y} Layer: {u.layer}, Parent: {u._parent}", True) 
       break
     for vid in u._nbrs:
       v = V[vid]
@@ -136,23 +136,23 @@ def astar(V, s, t):
           Q.update(v, newcost)
         else:
           # if v == t:
-          #   printlog(f"Inserted Target Parent ID: {u._id} XY : {u.x}, {u.y} Layer: {u.layer}, Parent: {u._parent}", True)
-          #   printlog(f"Inserted Target ID: {v._id} XY : {v.x}, {v.y} Layer: {v.layer}, Parent: {v._parent}", True)
+          #   # printlog(f"Inserted Target Parent ID: {u._id} XY : {u.x}, {u.y} Layer: {u.layer}, Parent: {u._parent}", True)
+          #   # printlog(f"Inserted Target ID: {v._id} XY : {v.x}, {v.y} Layer: {v.layer}, Parent: {v._parent}", True)
           Q.push(v)
 
-  # printlog(f" Actual Target ID: {t._id} XY : {t.x}, {t.y} Layer: {t.layer}, Parent: {t._parent}",True)
+  # # printlog(f" Actual Target ID: {t._id} XY : {t.x}, {t.y} Layer: {t.layer}, Parent: {t._parent}",True)
   path = [t]
   while path[-1]._parent is not None:
     path.append(path[-1]._parent)
   return path
 
-def printlog(str, print=False):
-  timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-  logline = f"{timestamp} {str}"
-  if VERBOSE and print:
-    # print(logline)
-    with open(LOG_FILE, "a") as f:
-      f.write(logline + "\n")
+# def # printlog(str, print=False):
+#   timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+#   logline = f"{timestamp} {str}"
+#   if VERBOSE and print:
+#     # print(logline)
+#     with open(LOG_FILE, "a") as f:
+#       f.write(logline + "\n")
 
 
 # instance from the component list that is transformed using the orientation and origin
@@ -186,46 +186,6 @@ class Inst:
         r.transform(comp.orient(), origin, macro.xdim(), macro.ydim())
         self._obsts[layer].append(r)
 
-def plot_vertices(tr_dict, net_name):
-  """Plot vertices for each layer in tr_dict"""
-  import matplotlib.pyplot as plt
-  fig, axs = plt.subplots(2, 3, figsize=(15, 10))
-  fig.suptitle(f'Vertices for net {net_name}')
-  
-  # Map layers to subplot positions
-  layer_to_pos = {
-    'li1': (0, 0),
-    'met1': (0, 1),
-    'met2': (0, 2),
-    'met3': (1, 0),
-    'met4': (1, 1),
-    'met5': (1, 2)
-  }
-  
-  # Plot vertices for each layer
-  for layer in layerColors:
-    if layer not in tr_dict:
-      continue
-        
-    row, col = layer_to_pos[layer]
-    ax = axs[row, col]
-    
-    # Plot vertices
-    x_coords = []
-    y_coords = []
-    for track_pos, vertices in tr_dict[layer].items():
-      for vertex in vertices:
-        x_coords.append(vertex.x)
-        y_coords.append(vertex.y)
-    
-    ax.scatter(x_coords, y_coords, c=layerColors[layer], label=f'{layer} vertices')
-    ax.set_title(f'Layer {layer}')
-    ax.grid(True)
-    ax.legend()
-  
-  plt.tight_layout()
-  plt.savefig(f'ref/vertices_{net_name}.png')
-  plt.close()
 
 def li1_cost(layer):
   return 100000 if layer == 'li1' else 0
@@ -386,7 +346,7 @@ class Net:
     # Construct graph based on the guides and tracks information
     trdict, vertices = self.create_graph(layerTrees, tracks)
     srcs = self.get_src_tgt_vertices(trdict, vertices, tracks)
-    printlog(f"Source vertices", True)
+    # printlog(f"Source vertices", True)
     # print_sources(srcs, vertices)
     ## Call astar for each source and target pair and get the path
     paths = self.getpath(srcs, vertices)
@@ -492,7 +452,7 @@ class Net:
         if layerOrient[layer] == 'VERTICAL':
           r, xp = find_tracks_y(layer, rects, trdict)
           if xp is None: 
-            printlog(f"No tracks found for pin {p} on layer {layer}", True)
+            # printlog(f"No tracks found for pin {p} on layer {layer}", True)
             continue
           tr_vertices = trdict[layer][xp]
           yc = r.ll.y + (r.ur.y - r.ll.y) // 2
@@ -513,7 +473,7 @@ class Net:
         else:
           r, yp = find_tracks_x(layer, rects, trdict)
           if yp is None: 
-            printlog(f"No tracks found for pin {p} on layer {layer}", True)
+            # printlog(f"No tracks found for pin {p} on layer {layer}", True)
             continue
           tr_vertices = trdict[layer][yp]
           xc = r.ll.x + (r.ur.x - r.ll.x) // 2
@@ -540,11 +500,11 @@ def find_tracks_y(layer, rects, trdict):
   for r in rects:
     for pos in trdict[layer]:
       if r.ll.x <= pos - b <= r.ur.x or r.ll.x <= pos + b <= r.ur.x:
-        # printlog(f"XP: {pos} Rect: {r.ll.x}, {r.ll.y}, {r.ur.x}, {r.ur.y} Layer: {layer} Tracks: {trdict[layer].keys()}", True)        
+        # # printlog(f"XP: {pos} Rect: {r.ll.x}, {r.ll.y}, {r.ur.x}, {r.ur.y} Layer: {layer} Tracks: {trdict[layer].keys()}", True)        
         rect, tr = r, pos
 
-  if rect is not None:
-    printlog(f"XP: {tr} Rect: {rect.ll.x}, {rect.ll.y}, {rect.ur.x}, {rect.ur.y} Layer: {layer} Tracks: {trdict[layer].keys()}", False)   
+  # if rect is not None:
+  #   # printlog(f"XP: {tr} Rect: {rect.ll.x}, {rect.ll.y}, {rect.ur.x}, {rect.ur.y} Layer: {layer} Tracks: {trdict[layer].keys()}", False)   
   
   return rect, tr
 
@@ -554,11 +514,11 @@ def find_tracks_x(layer, rects, trdict):
   for r in rects:
     for pos in trdict[layer]:
       if r.ll.y <= pos - b <= r.ur.y or r.ll.y <= pos + b <= r.ur.y:
-        # printlog(f"YP: {pos} Rect: {r.ll.x}, {r.ll.y}, {r.ur.x}, {r.ur.y} Layer: {layer} Tracks: {trdict[layer].keys()}", True)        
+        # # printlog(f"YP: {pos} Rect: {r.ll.x}, {r.ll.y}, {r.ur.x}, {r.ur.y} Layer: {layer} Tracks: {trdict[layer].keys()}", True)        
         rect, tr = r, pos
 
-  if rect is not None:
-    printlog(f"XP: {tr} Rect: {rect.ll.x}, {rect.ll.y}, {rect.ur.x}, {rect.ur.y} Layer: {layer} Tracks: {trdict[layer].keys()}", False)     
+  # if rect is not None:
+  #   # printlog(f"XP: {tr} Rect: {rect.ll.x}, {rect.ll.y}, {rect.ur.x}, {rect.ur.y} Layer: {layer} Tracks: {trdict[layer].keys()}", False)     
   
   return rect, tr
 
@@ -576,32 +536,32 @@ def get_bbox(rects):
 
 def print_trdict(tr_dict):
   for layer in tr_dict:
-    printlog(f"Layer: {layer}, DIR:{layerOrient[layer]}", True)
+    # printlog(f"Layer: {layer}, DIR:{layerOrient[layer]}", True)
     track_info = ""
     for tr in tr_dict[layer]:
       track_info += f" {tr}"
-    printlog(f"  Tracks: {track_info}", True)  
+    # printlog(f"  Tracks: {track_info}", True)  
 
-def print_path(paths):
-  printlog("Paths:", True)
-  for path in paths:
-    printlog("  Path:", True)
-    for v in path:
-      printlog(f"    Vertex: {v.x}, {v.y} Layer: {v.layer}", True)
+# def print_path(paths):
+#   # printlog("Paths:", True)
+#   for path in paths:
+#     # printlog("  Path:", True)
+#     for v in path:
+#       # printlog(f"    Vertex: {v.x}, {v.y} Layer: {v.layer}", True)
 
 
 
-def print_sources(srcs, vertices):
-  for v in srcs:
-    printlog(f"ID: {v._id} Vertex: {v.x}, {v.y} Layer: {v.layer}", True)
-    for nbr in v._nbrs:
-      printlog(f"  NBR ID: {nbr} Vertex: {vertices[nbr].x}, {vertices[nbr].y} Layer: {vertices[nbr].layer}", True)
+# def print_sources(srcs, vertices):
+#   for v in srcs:
+#     # printlog(f"ID: {v._id} Vertex: {v.x}, {v.y} Layer: {v.layer}", True)
+#     for nbr in v._nbrs:
+#       # printlog(f"  NBR ID: {nbr} Vertex: {vertices[nbr].x}, {vertices[nbr].y} Layer: {vertices[nbr].layer}", True)
 
-def print_vertices(vertices):
-  for v in vertices:
-    printlog(f"ID: {v._id} Vertex: {v.x}, {v.y} Layer: {v.layer}", True)
-    for nbr in v._nbrs:
-      printlog(f"  NBR ID: {nbr} Vertex: {vertices[nbr].x}, {vertices[nbr].y} Layer: {vertices[nbr].layer}", True)
+# def print_vertices(vertices):
+#   for v in vertices:
+#     # printlog(f"ID: {v._id} Vertex: {v.x}, {v.y} Layer: {v.layer}", True)
+#     for nbr in v._nbrs:
+#       # printlog(f"  NBR ID: {nbr} Vertex: {vertices[nbr].x}, {vertices[nbr].y} Layer: {vertices[nbr].layer}", True)
 
 def markUnusedPins(nets, insts, pins, obsts):
   markpins = {k:False for k in pins}
@@ -702,14 +662,14 @@ def sort_nets(nets):
   
   nets.sort(key=lambda n: n.hpwl())
 
-def printnets(nets):
-  for net in nets:
-    printlog(f"Net: {net._name} ID: {net._id} HPWL: {net.hpwl()} BBox: {net._bbox.ll.x}, {net._bbox.ll.y}, {net._bbox.ur.x}, {net._bbox.ur.y}", True)
-    for p, lr in net._pins.items():
-      printlog(f"  Pin: {p[1]} Type: {p[0]}", True)
-      for layer, rects in lr.items():
-        for r in rects:
-          printlog(f"    Layer:{layer} Rect: {r.ll.x}, {r.ll.y}, {r.ur.x}, {r.ur.y}", True)
+# def printnets(nets):
+#   for net in nets:
+#     # printlog(f"Net: {net._name} ID: {net._id} HPWL: {net.hpwl()} BBox: {net._bbox.ll.x}, {net._bbox.ll.y}, {net._bbox.ur.x}, {net._bbox.ur.y}", True)
+#     for p, lr in net._pins.items():
+#       # printlog(f"  Pin: {p[1]} Type: {p[0]}", True)
+#       for layer, rects in lr.items():
+#         for r in rects:
+#           # printlog(f"    Layer:{layer} Rect: {r.ll.x}, {r.ll.y}, {r.ur.x}, {r.ur.y}", True)
 
 
 
@@ -740,7 +700,7 @@ def parse_guides(netDict, guide):
         if len(parts) != 5:
           continue
         x1, y1, x2, y2, layer = parts
-        printlog(f"Guide net: {current_net}", False)
+        # printlog(f"Guide net: {current_net}", False)
         if current_net not in netDict:
           continue
         if layer not in netDict[current_net]._guides:
@@ -748,13 +708,13 @@ def parse_guides(netDict, guide):
         netDict[current_net]._guides[layer].append(Rect(int(x1), int(y1), int(x2), int(y2)))
 
 
-def printguides(nets):
-  for net in nets:
-    printlog(f"Net: {net._name} ID: {net._id}", False)
-    for layer, rects in net._guides.items():
-      printlog(f"  Layer: {layer}", False)
-      for r in rects:
-        printlog(f"    Rect: {r.ll.x}, {r.ll.y}, {r.ur.x}, {r.ur.y}", False)
+# def printguides(nets):
+#   for net in nets:
+#     # printlog(f"Net: {net._name} ID: {net._id}", False)
+#     for layer, rects in net._guides.items():
+#       # printlog(f"  Layer: {layer}", False)
+#       for r in rects:
+#         # printlog(f"    Rect: {r.ll.x}, {r.ll.y}, {r.ur.x}, {r.ur.y}", False)
 
 def add_net_shapes(net, netDEF):
   for r in net._sol:
@@ -767,7 +727,7 @@ def update_rtree(layerTrees, shapes, netid):
     layerTrees[layer].insert(count, (rect.ll.x, rect.ll.y, rect.ur.x, rect.ur.y), obj=netid)
     count += 1
   layerTrees['count'] = count
-  # printlog(f"Layer: {layer} Rect: {r.ll.x}, {r.ll.y}, {r.ur.x}, {r.ur.y}", True)
+  # # printlog(f"Layer: {layer} Rect: {r.ll.x}, {r.ll.y}, {r.ur.x}, {r.ur.y}", True)
 
 def get_shapes_within_guides(layerTrees, guides):
   # Create new rtree for filtered shapes
@@ -811,7 +771,7 @@ def route_nets(nets: list[Net], layerTrees, tracks):
   ids = [7] # 1: N1_d, 8:N3, 9:N3_d, 15: net1, 6: _06_, 4: N22_d, 95: N738, 312: net30, 355: net7, 7: _07_
   for net in nets:
     # if net._id in ids:
-      printlog(f"Routing net: {net._name} ID: {net._id}", True)
+      # printlog(f"Routing net: {net._name} ID: {net._id}", True)
       nrt = get_shapes_within_guides(layerTrees, net._guides) # Get shapes within the net guide regions
       net.route(nrt, tracks)
       update_rtree(layerTrees, net._sol, net._id)
@@ -836,110 +796,74 @@ def writeDEF(netDict, ideff, odef):
 
 
 
-def plot_rectangles(color='blue', alpha=0.5, title="Rectangles"):
-  import matplotlib.pyplot as plt
-  import matplotlib.patches as patches
+# def plot_rectangles(color='blue', alpha=0.5, title="Rectangles"):
+#   import matplotlib.pyplot as plt
+#   import matplotlib.patches as patches
 
-  rects = []
-  rects1 = []
-  rects2 = []
-  rects3 = []
+#   rects = []
+#   rects1 = []
+#   rects2 = []
+#   rects3 = []
 
-  rects.append(Rect(7925, 12440, 8195, 13345))
-  rects.append(Rect(8015, 11640, 8195, 12440))
-  rects.append(Rect(7935, 11135, 8195, 11640))
-  rects.append(Rect(10265, 20435, 10620, 20995))
-  rects.append(Rect(9755, 14995, 10090, 15265))
-  rects.append(Rect(11640, 17315, 11925, 17975))
+#   allrects = [rects, rects1, rects2, rects3]
+#   colors = ['blue', 'red', 'green', 'yellow']
 
-  rects1.append(Rect(10265, 20465, 10475, 20820))
-  rects1.append(Rect(7885, 11282, 8095, 11495))
-  rects1.append(Rect(7885, 11282, 8095, 11495))
-  rects1.append(Rect(11625, 17405, 11835, 17750))
-  rects1.append(Rect(7885, 11282, 8095, 11495))
-  rects1.append(Rect(10265, 20465, 10475, 20820))
-  rects1.append(Rect(11625, 17405, 11835, 17750))
-  rects1.append(Rect(10265, 20465, 10475, 20820))
-  rects1.append(Rect(11625, 17405, 11835, 17750))
-  rects2.append(Rect(10260, 20480, 10460, 20660 ))
-  rects2.append(Rect(7900, 11300, 10440, 11480 ))
-  rects2.append(Rect(9800, 15040, 10120, 15220 ))
-  rects2.append(Rect(7900, 11300, 9980 ,11480 ))
-  rects2.append(Rect(11180, 16740, 11820, 16920 ))
-  rects2.append(Rect(7900, 11300, 11360, 11480 ))
-  rects2.append(Rect(9940, 15040, 10440, 15220 ))
-  rects2.append(Rect(10260, 20480, 10460, 20660 ))
-  rects2.append(Rect(10280, 20480, 11820, 20660 ))
-  rects2.append(Rect(10720, 16740, 11820, 16920 ))
-  rects2.append(Rect(9940, 15040, 10900, 15220 ))
-  rects3.append(Rect(10260, 11300, 10440, 20660 ))
-  rects3.append(Rect(9800 ,11300, 9980 ,15220 ))
-  rects3.append(Rect(11640, 16740, 11820, 17600 ))
-  rects3.append(Rect(11180, 11300, 11360, 16920 ))
-  rects3.append(Rect(10260, 15040, 10440, 20660 ))
-  rects3.append(Rect(11640, 17420, 11820, 20660 ))
-  rects3.append(Rect(11640, 16740, 11820, 17600 ))
-  rects3.append(Rect(10720, 15040, 10900, 16920 ))
-
-  allrects = [rects, rects1, rects2, rects3]
-  colors = ['blue', 'red', 'green', 'yellow']
-
-  """
-  Plot a list of rectangles
-  Args:
-    rects: List of Rect objects with ll (lower left) and ur (upper right) coordinates
-    color: Color for the rectangles
-    alpha: Transparency value (0-1)
-    title: Plot title
-  """
-  fig, ax = plt.subplots()
+#   """
+#   Plot a list of rectangles
+#   Args:
+#     rects: List of Rect objects with ll (lower left) and ur (upper right) coordinates
+#     color: Color for the rectangles
+#     alpha: Transparency value (0-1)
+#     title: Plot title
+#   """
+#   fig, ax = plt.subplots()
   
-  # Plot each rectangle 
-  for i, rects in enumerate(allrects):
-    color = colors[i]
-    for rect in rects:
-      width = rect.ur.x - rect.ll.x
-      height = rect.ur.y - rect.ll.y
+#   # Plot each rectangle 
+#   for i, rects in enumerate(allrects):
+#     color = colors[i]
+#     for rect in rects:
+#       width = rect.ur.x - rect.ll.x
+#       height = rect.ur.y - rect.ll.y
       
-      rect_patch = patches.Rectangle(
-        (rect.ll.x, rect.ll.y),
-        width, height,
-        facecolor=color,
-        alpha=alpha
-      )
-      ax.add_patch(rect_patch)
+#       rect_patch = patches.Rectangle(
+#         (rect.ll.x, rect.ll.y),
+#         width, height,
+#         facecolor=color,
+#         alpha=alpha
+#       )
+#       ax.add_patch(rect_patch)
   
-  # Update plot limits to show all rectangles
-  ax.autoscale()
+#   # Update plot limits to show all rectangles
+#   ax.autoscale()
   
-  # Add grid and title
-  ax.grid(True)
-  ax.set_title(title)
+#   # Add grid and title
+#   ax.grid(True)
+#   ax.set_title(title)
   
-  plt.show()
+#   plt.show()
 
-def get_pins_data(nets):
-  # Dictionary to store count of nets with specific number of pins
-  pin_stats = {}
+# def get_pins_data(nets):
+#   # Dictionary to store count of nets with specific number of pins
+#   pin_stats = {}
   
-  for net in nets:
-    num_pins = len(net._pins)
-    pin_stats[num_pins] = pin_stats.get(num_pins, 0) + 1
+#   for net in nets:
+#     num_pins = len(net._pins)
+#     pin_stats[num_pins] = pin_stats.get(num_pins, 0) + 1
   
-  # Print statistics
-  printlog("Net Pin Statistics:", True)
-  printlog("-------------------", True)
-  for num_pins in sorted(pin_stats.keys()):
-    printlog(f"Nets with {num_pins} pins: {pin_stats[num_pins]}", True)
-  printlog("-------------------", True)
+#   # Print statistics
+#   # printlog("Net Pin Statistics:", True)
+#   # printlog("-------------------", True)
+#   for num_pins in sorted(pin_stats.keys()):
+#     # printlog(f"Nets with {num_pins} pins: {pin_stats[num_pins]}", True)
+#   # printlog("-------------------", True)
   
-  # Calculate percentage distribution
-  total_nets = len(nets)
-  printlog("Percentage Distribution:", True)
-  for num_pins in sorted(pin_stats.keys()):
-    percentage = (pin_stats[num_pins] / total_nets) * 100
-    printlog(f"{num_pins} pins: {percentage:.2f}%", True)
-  printlog("-------------------", True)
+#   # Calculate percentage distribution
+#   total_nets = len(nets)
+#   # printlog("Percentage Distribution:", True)
+#   for num_pins in sorted(pin_stats.keys()):
+#     percentage = (pin_stats[num_pins] / total_nets) * 100
+#     # printlog(f"{num_pins} pins: {percentage:.2f}%", True)
+#   # printlog("-------------------", True)
 
 
 ## Detail Router
@@ -973,31 +897,22 @@ def detailed_route(idef, ilef, guide, odef):
 
 
 if __name__ == "__main__":
-  
-  import argparse
-
-  ap = argparse.ArgumentParser()
-  ap.add_argument("-l", "--leff", type=str, default="", help='<lef file>')
-  ap.add_argument("-o", "--odeff", type=str, default="", help='<output def file>')
-  ap.add_argument("-i", "--ideff", type=str, default="", help='<input def file>')
-  ap.add_argument("-g", "--guide", type=str, default="", help='<guide file>')  
-  ap.add_argument("-p", "--plot", action='store_true')
-  args = ap.parse_args()
-  # if args.leff != "" and args.ideff != "" and args.odeff != "":
-  #   loadAndCheck(args.odeff, args.ideff, args.leff, args.plot)
-
-  # ckt = "c17"
-  idef = args.ideff # f"def/{ckt}.def"
-  ilef = args.leff # f"lef/sky130.lef"
-  guide = args.guide # f"gr/{ckt}.guide"
-  odef = args.odeff # f"sol/{ckt}_out.def"    
-  VERBOSE = False
-  LOG_FILE = f"logs/router_{idef}.log"
-  printlog(f"Start routing {idef}", True)
-  printlog(f"                     ", True)
-  printlog(f"                     ", True)
-  printlog(f"                     ", True)
-  detailed_route(idef, ilef, guide, odef)
-  
+  # Example usage
+  for ckt in ["c17", "add5", "c432", "c499", "spm", "c6288", "c7552"]:
+    idef = f"../def/{ckt}.def"
+    ilef = f"../lef/sky130.lef"
+    guide = f"../gr/{ckt}.guide"
+    odef = f"{ckt}_out.def"    
+    VERBOSE = False
+    # LOG_FILE = f"router_{ckt}.log"
+    # printlog(f"Start routing {ckt}", True)
+    # printlog(f"                     ", True)
+    # printlog(f"                     ", True)
+    # printlog(f"                     ", True)
+    import time
+    start_time = time.time()
+    detailed_route(idef, ilef, guide, odef)
+    end_time = time.time()
+    print(f"Time taken for {ckt}: {end_time - start_time:.2f} seconds")
   # from checker import loadAndCheck
   # loadAndCheck(odef, idef, ilef, False)
